@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024 Canonical Ltd.
+name: Release Image
+
+on:
+  workflow_call:
+    inputs:
+      branch-name:
+        description: Name of the branch to checkout
+        required: false
+        type: string
+        default: ${{ github.ref }}
+      github-release-changed:
+        description: Name of the branch to checkout
+        required: true
+        type: boolean
+      github-release-version:
+        description: Name of the branch to checkout
+        required: true
+        type: string
+
+jobs:
+  release-image:
+    if: ${{ inputs.github-release-changed == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: docker.io
+      DOCKER_REGISTRY: docker.io/
+      DOCKER_REPOSITORY: omecproject/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+      - uses: docker/login-action@v3.3.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Push release Docker image
+        env:
+          DOCKER_TAG: rel-${{ inputs.github-release-version }}
+        run: |
+          make docker-build
+          make docker-push

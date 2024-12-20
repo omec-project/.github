@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024 Canonical Ltd.
+
+name: Create Release
+
+on:
+  workflow_call:
+    outputs:
+      changed:
+        description: "The first job output"
+        value: ${{ jobs.create-github-release.outputs.changed }}
+      version:
+        description: "The second job output"
+        value: ${{ jobs.create-github-release.outputs.version }}
+      release-branch:
+        description: "The second job output"
+        value: ${{ jobs.create-github-release.outputs.release_branch }}
+      version-branch:
+        description: "The second job output"
+        value: ${{ jobs.create-github-release.outputs.version_branch }}
+
+
+jobs:
+
+  create-github-release:
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'omec-project'}}
+    outputs:
+      changed: ${{ steps.version-change.outputs.changed }}
+      version: ${{ steps.version-change.outputs.version }}
+      release_branch: ${{ steps.version-change.outputs.release_branch }}
+      version_branch: ${{ steps.version-change.outputs.version_branch }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get changes
+        id: version-file
+        run: |
+          if git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep VERSION; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            version_before=$(git show ${{ github.event.before }}:VERSION)
+            echo "version_before=$version_before" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION file was not changed"
+          fi
+
+      - name: Validate change in version file
+        id: version-change
+        if: ${{ steps.version-file.outputs.changed == 'true' }}
+        run: |
+          version=$(cat VERSION)
+          version_before_full=${{ steps.version-file.outputs.version_before }}
+          version_before=${version_before_full::-4}
+          echo "version=$version"
+          echo "version_before=$version_before"
+          validate="^[0-9]+\.[0-9]+\.[0-9]+$"
+          if [[ $version =~ $validate ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$version" >> $GITHUB_OUTPUT
+          else
+            echo "Version change not for release"
+          fi
+          if [[ $version_before =~ $validate ]]; then
+            IFS='.' read -r major minor patch <<< "$version"
+            IFS='.' read -r major_b minor_b patch_b <<< "$version_before"
+            if [[ "$major" -ne "$major_b" ]] || [[ "$minor" -ne "$minor_b" ]]; then
+              version_branch="$major_b.$minor_b"
+              echo "release_branch=true" >> $GITHUB_OUTPUT
+              echo "version_branch=$version_branch" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Version change not for branch release"
+          fi
+
+      - name: Create Release
+        if: steps.version-change.outputs.changed == 'true'
+        uses: comnoco/create-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_OMEC_PAT }}
+        with:
+          tag_name: "v${{ steps.version-change.outputs.version }}"
+          release_name: "v${{ steps.version-change.outputs.version }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true

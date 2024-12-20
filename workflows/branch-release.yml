@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2024 Canonical Ltd.
+name: Branch Release
+
+on:
+  workflow_call:
+    inputs:
+      release-output-changed:
+        description: Release output changed
+        required: true
+        type: boolean
+      release-branch:
+        description: Releasing new branch required
+        required: true
+        type: boolean
+      version-branch:
+        description: New branch version
+        required: true
+        type: string
+
+jobs:
+  branch-release:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.release-output-changed == 'true' && inputs.release-branch == 'true'}}
+    env:
+      GITHUB_TOKEN: ${{ secrets.GH_OMEC_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: peterjgrainger/action-create-branch@v3.0.0
+        with:
+          branch: "rel-${{ inputs.version-branch }}"
+          sha: '${{ github.event.pull_request.head.sha }}'
