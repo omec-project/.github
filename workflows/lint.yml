@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2024 Canonical Ltd.
+# Copyright 2025 Canonical Ltd.
 name: Lint PR
 
 on:
@@ -19,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch-name }}
+          submodules: true
 
       - name: Setup
         uses: actions/setup-go@v5

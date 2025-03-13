@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2024 Canonical Ltd.
+# Copyright 2025 Canonical Ltd.
 name: Static analysis
 
 on:
@@ -11,10 +11,9 @@ on:
         type: string
         default: ${{ github.ref }}
 
-
-
 jobs:
   staticcheck:
+    name: Run Staticcheck
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

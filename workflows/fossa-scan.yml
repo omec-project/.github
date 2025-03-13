@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2024 Canonical Ltd.
+# Copyright 2025 Canonical Ltd.
 name: Fossa Scan
 
 on:
@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch-name }}
+
       - name: FOSSA scan
         uses: fossa-contrib/fossa-action@v3
         with:

@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Stale issue/pr
+
+on:
+  schedule:
+    - cron: "0 0 * * 0" # Each Sundays at midnight UTC
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9.0.2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: 'This issue has been stale for 120 days and will be closed in 15 days. Comment to keep it open.'
+          stale-pr-message: 'This pull request has been stale for 120 days and will be closed in 15 days. Comment to keep it open.'
+          stale-issue-label: 'stale/issue'
+          stale-pr-label: 'stale/pr'
+          days-before-stale: 120
+          days-before-close: 15
+          exempt-issue-labels: 'important,bug'
+          exempt-pr-labels: 'work-in-progress'

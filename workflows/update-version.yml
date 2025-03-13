@@ -1,52 +1,40 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2024 Canonical Ltd.
+# Copyright 2025 Canonical Ltd.
 name: Update Version
-on:
-  workflow_call:
-    inputs:
-      branch-name:
-        description: Name of the branch to checkout
-        required: false
-        type: string
-        default: ${{ github.ref }}
-      release-changed:
-        description: Name of the branch to checkout
-        required: false
-        type: boolean
-      release-version:
-        description: Name of the branch to checkout
-        required: false
-        type: boolean
 
+on:
+  workflow_run:
+    workflows: ["Tag GitHub"]
+    types:
+      - completed
 
 jobs:
   update-version:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    if: ${{ input.release-changed == 'true' }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Increment version
         run: |
-          version=${{ input.release-version }}
+          version=${{ github.event.workflow_run.outputs.version }}
           IFS='.' read -r major minor patch <<< "$version"
           patch_update=$((patch+1))
           NEW_VERSION="$major.$minor.$patch_update-dev"
           echo $NEW_VERSION > VERSION
-          echo "Updated version: $NEW_VERSION"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions"
+          git add VERSION && git commit -m "Update VERSION file to $NEW_VERSION" && git push
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
         with:
-          base: ${{ inputs.branch-name }}
           token: ${{ secrets.GH_OMEC_PAT }}
           commit-message: Update version
           committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
           author: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>
           signoff: true
-          branch: "chore/version-update"
+          branch: version-update
           delete-branch: true
           title: Update version
           body: |

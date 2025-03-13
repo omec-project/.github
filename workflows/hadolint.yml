@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2024 Canonical Ltd.
+# Copyright 2025 Canonical Ltd.
 name: Hadolint
 
 on:
   workflow_call:
     inputs:
       branch-name:
-        description: Name of the branch to checkout
+        description: Name of the branch to checkout. Defaults to the branch that triggered the action.
         required: false
         type: string
         default: ${{ github.ref }}
@@ -16,9 +16,11 @@ jobs:
   hadolint:
     name: hadolint
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch-name }}
+
       - name: Dockerfile linter
         uses: hadolint/hadolint-action@v3.1.0
         # Ignoring:
@@ -27,3 +29,4 @@ jobs:
         with:
           dockerfile: Dockerfile
           ignore: DL3008,DL3018
+
