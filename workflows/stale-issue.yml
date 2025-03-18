@@ -13,13 +13,6 @@ on:
         description: 'Days before close'
         default: 15
         required: true
-      cron_schedule:
-        description: 'Schedule to run the job'
-        default: "0 0 * * *"
-        required: true
-
-  schedule:
-    - cron: ${{ inputs.cron_schedule }}
 
 jobs:
   stale:
