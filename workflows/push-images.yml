@@ -5,7 +5,19 @@ name: Push Images
 on:
   workflow_call:
     inputs:
-      branch-name:
+      registry:
+        description: "Registry URL"
+        default: "registry.aetherproject.org"
+        type: string
+      docker_registry:
+        description: "Docker Registry URL"
+        default: "registry.aetherproject.org/"
+        type: string
+      docker_repository:
+        description: "Docker repository"
+        default: "sdcore/"
+        type: string
+      branch_name:
         description: Name of the branch to checkout
         required: false
         type: string
@@ -16,10 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'omec-project'
     env:
-      REGISTRY: registry.aetherproject.org
-      DOCKER_REGISTRY: registry.aetherproject.org/
-      DOCKER_REPOSITORY: sdcore/
-      BRANCH_NAME: ${{ inputs.branch-name }}
+      REGISTRY: ${{ inputs.registry }}
+      DOCKER_REGISTRY: ${{ inputs.docker_registry }}
+      DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
+      BRANCH_NAME: ${{ inputs.branch_name }}
     steps:
       - uses: actions/checkout@v4
         with:
