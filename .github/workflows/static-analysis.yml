@@ -5,7 +5,7 @@ name: Static analysis
 on:
   workflow_call:
     inputs:
-      branch-name:
+      branch_name:
         description: Name of the branch to checkout
         required: false
         type: string
@@ -19,7 +19,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.branch-name }}
+          ref: ${{ inputs.branch_name }}
 
       - name: Setup
         uses: WillAbides/setup-go-faster@v1.14.0
