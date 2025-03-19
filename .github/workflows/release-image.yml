@@ -4,7 +4,8 @@ name: Release Docker Image
 
 on:
   workflow_run:
-    workflows: ["Tag GitHub"]
+    workflows:
+      - "Tag GitHub"
     types:
       - completed
 
@@ -18,6 +19,7 @@ jobs:
       DOCKER_REPOSITORY: omecproject/
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'

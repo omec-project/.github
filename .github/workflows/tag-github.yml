@@ -62,6 +62,6 @@ jobs:
 
       - name: Create release
         if: steps.version-change.outputs.changed == 'true'
-        uses: ./actions/create-github-release
+        uses: ./.github/actions/create-github-release
         with:
           VERSION: ${{ steps.version-change.outputs.version }}

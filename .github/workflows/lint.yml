@@ -15,11 +15,9 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch_name }}
-          submodules: true
 
       - name: Setup
         uses: actions/setup-go@v5

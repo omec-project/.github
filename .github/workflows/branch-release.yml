@@ -4,7 +4,8 @@ name: Branch Release
 
 on:
   workflow_run:
-    workflows: ["Tag GitHub"]
+    workflows:
+      - "Tag GitHub"
     types:
       - completed
 

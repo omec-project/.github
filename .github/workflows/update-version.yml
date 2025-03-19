@@ -4,7 +4,8 @@ name: Update Version
 
 on:
   workflow_run:
-    workflows: ["Tag GitHub"]
+    workflows:
+      - "Tag GitHub"
     types:
       - completed
 
@@ -22,9 +23,6 @@ jobs:
           patch_update=$((patch+1))
           NEW_VERSION="$major.$minor.$patch_update-dev"
           echo $NEW_VERSION > VERSION
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "GitHub Actions"
-          git add VERSION && git commit -m "Update VERSION file to $NEW_VERSION" && git push
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v7
@@ -32,7 +30,6 @@ jobs:
           token: ${{ secrets.GH_OMEC_PAT }}
           commit-message: Update version
           committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-          author: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>
           signoff: true
           branch: version-update
           delete-branch: true

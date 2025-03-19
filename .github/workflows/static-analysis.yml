@@ -16,13 +16,12 @@ jobs:
     name: Run Staticcheck
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch_name }}
 
-      - name: Setup
-        uses: WillAbides/setup-go-faster@v1.14.0
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
 
