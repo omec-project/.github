@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
     inputs:
       days_before_stale:
-        description: 'Days before stale'
+        description: "Days before stale"
         default: 120
         required: true
       days_before_close:
-        description: 'Days before close'
+        description: "Days before close"
         default: 15
         required: true
 
