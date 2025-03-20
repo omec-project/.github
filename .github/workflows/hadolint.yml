@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Hadolint
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout. Defaults to the branch that triggered the action."
+        required: false
+        type: string
+        default: ${{ github.ref }}
+
+jobs:
+  hadolint:
+    name: Dockerfile Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
+
+      - name: Dockerfile linter
+        uses: hadolint/hadolint-action@v3.1.0
+        # Ignoring:
+        # DL3008 warning: Pin versions in apt get install (e.g., apt-get install <package>=<version>); and
+        # DL3018 warning: Pin versions in apk add (e.g., apk add <package>=<version>)
+        with:
+          dockerfile: Dockerfile
+          ignore: DL3008,DL3018

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: "Create Github release"
+description: "Create a GitHub release using the provided version"
+
+inputs:
+  VERSION:
+    description: "Version to release on Github"
+    type: string
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: "API request to create release"
+      shell: bash
+      run: |
+        if gh release create "${{ inputs.VERSION }}" --generate-notes; then
+          echo "Release ${{ inputs.VERSION }} created ✅" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release ${{ inputs.VERSION }} created ✅"
+        else
+          echo "Failed to create release ${{ inputs.VERSION }} ❌" >> "$GITHUB_STEP_SUMMARY"
+          echo "Failed to create release ${{ inputs.VERSION }} ❌"
+        fi

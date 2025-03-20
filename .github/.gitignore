@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+.idea/
+# Visual Studio Code
+.vscode/
+# debug
+*.log
+*.pcap
+
+

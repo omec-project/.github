@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      time: "21:00"
+      timezone: "America/Los_Angeles"
+    commit-message:
+      prefix: "chore: "
+    labels:
+      - dependencies
+    target-branch: "main"

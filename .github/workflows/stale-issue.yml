@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Stale issue/pr
+
+on:
+  workflow_dispatch:
+    inputs:
+      days_before_stale:
+        description: "Days before stale"
+        default: 120
+        required: true
+      days_before_close:
+        description: "Days before close"
+        default: 15
+        required: true
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9.0.2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          stale-issue-message: 'This issue has been stale for  ${{ inputs.days_before_stale }} days and will be closed in ${{ inputs.days_before_close }} days. Comment to keep it open.'
+          stale-pr-message: 'This pull request has been stale for ${{ inputs.days_before_stale }} days and will be closed in ${{ inputs.days_before_close }} days. Comment to keep it open.'
+          stale-issue-label: 'stale/issue'
+          stale-pr-label: 'stale/pr'
+          days-before-stale: ${{ inputs.days_before_stale }}
+          days-before-close: ${{ inputs.days_before_close }}
+          exempt-issue-labels: 'important,bug'
+          exempt-pr-labels: 'work-in-progress'
