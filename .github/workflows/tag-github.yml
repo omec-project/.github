@@ -42,22 +42,36 @@ jobs:
           echo "version=$version"
           echo "version_before=$version_before"
           validate="^[0-9]+\.[0-9]+\.[0-9]+$"
+
           if [[ $version =~ $validate ]]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "version=$version" >> $GITHUB_OUTPUT
+           echo "changed=true" >> $GITHUB_OUTPUT
+           echo "version=$version" >> $GITHUB_OUTPUT
           else
-            echo "Version change not for release"
+           echo "Invalid version format in VERSION file"
+           exit 1
           fi
+
           if [[ $version_before =~ $validate ]]; then
-            IFS='.' read -r major minor patch <<< "$version"
-            IFS='.' read -r major_b minor_b patch_b <<< "$version_before"
-            if [[ "$major" -ne "$major_b" ]] || [[ "$minor" -ne "$minor_b" ]]; then
-              version_branch="$major_b.$minor_b"
-              echo "release_branch=true" >> $GITHUB_OUTPUT
-              echo "version_branch=$version_branch" >> $GITHUB_OUTPUT
-            fi
+           IFS='.' read -r major minor patch <<< "$version"
+           IFS='.' read -r major_b minor_b patch_b <<< "$version_before"
+          
+           version_branch="$major_b.$minor_b"
+           echo "version_branch=$version_branch" >> $GITHUB_OUTPUT
+          
+           if [[ "$major" -eq "$major_b" ]] && [[ "$minor" -eq "$minor_b" ]]; then
+             echo "Version is compatible with the branch"
+           else
+             echo "Version $version is not compatible with branch version $version_branch"
+             exit 1
+           fi
+          
+           if [[ "$major" -ne "$major_b" ]] || [[ "$minor" -ne "$minor_b" ]]; then
+             echo "release_branch=true" >> $GITHUB_OUTPUT
+             echo "version_branch=$version_branch" >> $GITHUB_OUTPUT
+           fi
           else
-            echo "Version change not for branch release"
+           echo "Invalid previous version format in VERSION file"
+           exit 1
           fi
 
       - name: Create release
