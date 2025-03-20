@@ -60,11 +60,11 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ env.DOCKER_IMAGE_NAME }}:${{ github.event.workflow_run.outputs.version }} .
+          make docker build -t ${{ env.DOCKER_IMAGE_NAME }}:${{ github.event.workflow_run.outputs.version }} .
 
       - name: Push to Docker Hub
         run: |
-          docker push ${{ env.DOCKER_IMAGE_NAME }}:${{ github.event.workflow_run.outputs.version }}
+          make docker push ${{ env.DOCKER_IMAGE_NAME }}:${{ github.event.workflow_run.outputs.version }}
 
       - name: Login to Aether registry
         uses: docker/login-action@v3.4.0
@@ -76,4 +76,4 @@ jobs:
       - name: Push to Aether registry
         run: |
           docker tag ${{ env.DOCKER_IMAGE_NAME }}:${{ github.event.workflow_run.outputs.version }}  ${{ env.AETHER_IMAGE_NAME }}:${{ github.event.workflow_run.outputs.version }}
-          docker push ${{ env.AETHER_IMAGE_NAME }}:${{ github.event.workflow_run.outputs.version }}
+          make docker push ${{ env.AETHER_IMAGE_NAME }}:${{ github.event.workflow_run.outputs.version }}
