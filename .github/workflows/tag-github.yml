@@ -54,17 +54,14 @@ jobs:
           if [[ $version_before =~ $validate ]]; then
            IFS='.' read -r major minor patch <<< "$version"
            IFS='.' read -r major_b minor_b patch_b <<< "$version_before"
-          
            version_branch="$major_b.$minor_b"
            echo "version_branch=$version_branch" >> $GITHUB_OUTPUT
-          
            if [[ "$major" -eq "$major_b" ]] && [[ "$minor" -eq "$minor_b" ]]; then
              echo "Version is compatible with the branch"
            else
              echo "Version $version is not compatible with branch version $version_branch"
              exit 1
            fi
-          
            if [[ "$major" -ne "$major_b" ]] || [[ "$minor" -ne "$minor_b" ]]; then
              echo "release_branch=true" >> $GITHUB_OUTPUT
              echo "version_branch=$version_branch" >> $GITHUB_OUTPUT
