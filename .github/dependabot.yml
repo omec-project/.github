@@ -11,6 +11,4 @@ updates:
       timezone: "America/Los_Angeles"
     commit-message:
       prefix: "chore: "
-    labels:
-      - dependencies
     target-branch: "main"
