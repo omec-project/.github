@@ -13,7 +13,6 @@ on:
 
 jobs:
   hadolint:
-    name: Dockerfile Linter
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
