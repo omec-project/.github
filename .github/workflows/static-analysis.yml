@@ -13,7 +13,6 @@ on:
 
 jobs:
   staticcheck:
-    name: Run Staticcheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
