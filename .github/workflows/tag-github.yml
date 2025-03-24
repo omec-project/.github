@@ -3,6 +3,8 @@
 name: Tag GitHub
 
 on:
+  workflow_call:
+
   push:
     paths:
       - "VERSION"
