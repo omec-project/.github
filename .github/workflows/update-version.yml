@@ -3,6 +3,8 @@
 name: Update Version
 
 on:
+  workflow_call:
+
   workflow_run:
     workflows:
       - "Tag GitHub"
