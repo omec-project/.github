@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Build PTF
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+
+jobs:
+  build-ptf:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ptf
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
+
+      - name: Build PTF image
+        run: make build
