@@ -10,11 +10,6 @@ on:
         required: false
         type: string
         default: ${{ github.ref }}
-      docker_env_vars:
-        description: "Extra environment variables for docker"
-        required: false
-        type: string
-        default: ""
 
 jobs:
   docker-build:
@@ -25,4 +20,4 @@ jobs:
           ref: ${{ inputs.branch_name }}
 
       - name: Build Docker image
-        run: ${{ inputs.docker_env_vars }} make docker-build
+        run: make docker-build

@@ -22,18 +22,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: 'go.mod'
+          cache: true
 
       - name: Generate protobuf
         run: make pb
 
       - name: Build the BESS-UPF Docker image
-        uses: ./.github/.github/workflows/docker-build.yml
-        with:
-          branch_name: ${{ github.ref }}
-          docker_env_vars: "DOCKER_TARGETS=bess"
+        run: DOCKER_TARGETS=bess make docker-build
 
       - name: Build the PFCP Agent Docker image
-        uses: ./.github/.github/workflows/docker-build.yml
-        with:
-          branch_name: ${{ github.ref }}
-          docker_env_vars: "DOCKER_TARGETS=pfcpiface"
+        run: DOCKER_TARGETS=pfcpiface make docker-build
