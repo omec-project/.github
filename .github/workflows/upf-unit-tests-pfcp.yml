@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Unit tests PFCP
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Unit tests
+        run: go test ./pfcpiface ./cmd/...
