@@ -3,7 +3,7 @@
 name: Stale issue/pr
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       days_before_stale:
         description: "Days before stale"
