@@ -7,10 +7,12 @@ on:
     inputs:
       days_before_stale:
         description: "Days before stale"
+        type: number
         default: 120
         required: true
       days_before_close:
         description: "Days before close"
+        type: number
         default: 15
         required: true
 
