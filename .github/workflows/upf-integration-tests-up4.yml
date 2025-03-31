@@ -25,6 +25,8 @@ jobs:
           cache: true
 
       - name: Integration tests BESS
-        run:
-          DOCKER_TARGETS=pfcpiface make docker-build
+        run: |
+          DOCKER_TARGETS=pfcpiface DOCKER_TAG=integration make docker-build
+          docker rm -f mock-up4 pfcpiface
+          docker network prune -f
           MODE=docker DATAPATH=up4 go test ./test/integration/...
