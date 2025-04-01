@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Untagged images
+
+on:
+  workflow_call:
+
+jobs:
+  purge-image:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'omec-project'
+    strategy:
+      matrix:
+        package: ["bess_build", "upf-epc-bess", "upf-epc-pfcpiface"]
+    steps:
+      - name: Delete image
+        uses: bots-house/ghcr-delete-image-action@3827559c68cb4dcdf54d813ea9853be6d468d3a4
+        with:
+          # NOTE: at now only orgs is supported
+          owner: omec-project
+          name: upf-epc/${{ matrix.package }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          untagged-keep-latest: 1
