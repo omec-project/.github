@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-Name: Main workflows
+name: Main workflows
 
 on:
   pull_request:
@@ -14,9 +14,9 @@ jobs:
   license-check:
     uses: ./.github/workflows/license-check.yml
     with:
-      branch_name: ${{ github.ref_name }}
+      branch_name: ${{ github.ref }}
 
   fossa-scan:
     uses: ./.github/workflows/fossa-scan.yml
     with:
-      branch_name: ${{ github.ref_name }}
+      branch_name: ${{ github.ref }}
