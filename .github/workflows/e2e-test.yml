@@ -25,8 +25,6 @@ jobs:
         run: |
           sudo apt update
           sudo apt-get install -y conntrack socat ipset ebtables ansible-core
-          sudo modprobe overlay
-          sudo modprobe br_netfilter
           sudo apt install -y sshpass python3-venv pipx make git
           pipx install --include-deps ansible
           pipx ensurepath
@@ -75,6 +73,19 @@ jobs:
         run: |
           make aether-5gc-install
 
+      - name: Patch K8s Deployment to attach local image
+        run: |
+          set -x
+          git clone https://github.com/omec-project/amf && \
+          cd amf && \
+          PR_NUMBER=$(echo "${GITHUB_REF}" | awk -F'/' '{print $3}') && \
+          git fetch origin pull/${PR_NUMBER}/merge:pr-${PR_NUMBER} && \
+          git checkout pr-${PR_NUMBER}
+          
+          docker build -t amf:testing . && \
+          kubectl set image deployment/amf amf=amf:testing -n aether-5gc && \
+          kubectl -n aether-5gc patch deployment amf -p '{"spec":{"template":{"spec":{"containers":[{"name":"amf","imagePullPolicy":"Never"}]}}}}'
+
       - name: Install GNBSIM
         working-directory: aether-onramp
         run: |
@@ -84,4 +95,14 @@ jobs:
         working-directory: aether-onramp
         run: |
           make aether-gnbsim-run
-          docker exec gnbsim-1 cat summary.log
+
+      - name: Validate results
+        working-directory: aether-onramp
+        run: |
+          status=$(docker exec gnbsim-1 cat summary.log)
+          if echo "$status" | grep -q "Profile Status: FAIL"; then
+            echo "Profile Status indicates failure."
+            exit 1
+          else
+            echo "Profile Status is successful."
+          fi
