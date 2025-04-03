@@ -12,7 +12,7 @@ on:
         default: ${{ github.ref }}
 
 jobs:
-  unit-tests:
+  integration-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
