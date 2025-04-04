@@ -1,5 +1,6 @@
-# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Canonical Ltd.
+# SPDX-FileCopyrightText: 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 name: E2E tests
 
 on:
@@ -20,26 +21,30 @@ jobs:
 
       - name: Update and install dependencies
         run: |
+          set -e
           sudo apt update
           sudo apt-get install -y conntrack socat ipset ebtables ansible-core
           sudo apt install -y sshpass python3-venv pipx make git
           pipx install --include-deps ansible
-          pipx ensurepath
-          source ~/.bashrc
+          export PATH=$PATH:~/.local/bin
 
       - name: Generate SSH Key
         run: |
+          set -e
           ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N "" -q
           cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
 
       - name: Clone aether-onramp repository
         run: |
-          git clone --recursive https://github.com/opennetworkinglab/aether-onramp.git
+          set -e
+          REPO_URL="https://github.com/opennetworkinglab/aether-onramp.git"
+          git clone --recursive ${REPO_URL}
 
       - name: Update files
         run: |
-          INTERFACE=$(ip route | grep default | awk '{print $5}')
-          IP_ADDR=$(ip a show ${INTERFACE} | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+          set -e
+          INTERFACE=$(ip route | awk '/default/ {print $5}')
+          IP_ADDR=$(ip -4 addr show ${INTERFACE} | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
           echo "Extracted IP: ${IP_ADDR}"
           echo "[all]" > aether-onramp/hosts.ini
           echo "node1 ansible_host=${IP_ADDR} ansible_user=runner ansible_ssh_private_key_file=~/.ssh/id_rsa" >> aether-onramp/hosts.ini
@@ -59,47 +64,58 @@ jobs:
 
       - name: Test aether-pingall
         working-directory: aether-onramp
-        run: make aether-pingall
+        run: |
+          set -e
+          make aether-pingall
 
       - name: Install aether-k8s
         working-directory: aether-onramp
         run: |
+          set -e
           make aether-k8s-install
 
       - name: Install 5G Core
         working-directory: aether-onramp
         run: |
+          set -e
           make aether-5gc-install
 
       - name: Patch K8s Deployment to attach local image
         run: |
-          set -x
-          git clone https://github.com/omec-project/amf && \
-          cd amf && \
-          PR_NUMBER=$(echo "${GITHUB_REF}" | awk -F'/' '{print $3}') && \
-          git fetch origin pull/${PR_NUMBER}/merge:pr-${PR_NUMBER} && \
+          set -ex
+          REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | cut -d'/' -f2)
+          REPO_URL="https://github.com/omec-project/${REPO_NAME}"
+          git clone ${REPO_URL} ${REPO_NAME} && cd ${REPO_NAME}
+          PR_NUMBER=$(echo "${GITHUB_REF}" | awk -F'/' '{print $3}')
+          git fetch origin pull/${PR_NUMBER}/merge:pr-${PR_NUMBER}
           git checkout pr-${PR_NUMBER}
-          docker build -t amf:testing . || exit 1
-          kubectl set image deployment/amf amf=amf:testing -n aether-5gc || exit 1
-          kubectl -n aether-5gc patch deployment amf -p '{"spec":{"template":{"spec":{"containers":[{"name":"amf","imagePullPolicy":"Never"}]}}}}' || exit 1
+          if [ "${REPO_NAME}" = "webconsole" ]; then
+            REPO_NAME="webui"
+          fi
+          docker build -t ${REPO_NAME}:testing .
+          kubectl set image deployment/${REPO_NAME} ${REPO_NAME}=${REPO_NAME}:testing -n aether-5gc
+          kubectl -n aether-5gc patch deployment ${REPO_NAME} \
+          -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${REPO_NAME}\",\"image\":\"${REPO_NAME}:testing\",\"imagePullPolicy\":\"Never\"}]}}}}"
 
       - name: Install GNBSIM
         working-directory: aether-onramp
         run: |
+          set -e
           make aether-gnbsim-install
 
       - name: Perform tests
         working-directory: aether-onramp
         run: |
+          set -e
           make aether-gnbsim-run
 
       - name: Validate results
         working-directory: aether-onramp
         run: |
+          set -e
           status=$(docker exec gnbsim-1 cat summary.log)
           if echo "$status" | grep -q "Profile Status: FAIL"; then
             echo "Profile Status indicates failure."
             exit 1
-          else
-            echo "Profile Status is successful."
           fi
+          echo "Profile Status is successful."
