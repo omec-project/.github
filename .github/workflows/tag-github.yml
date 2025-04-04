@@ -1,5 +1,6 @@
-# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Canonical Ltd.
+# SPDX-FileCopyrightText: 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 name: Tag GitHub
 
 on:
@@ -75,6 +76,6 @@ jobs:
 
       - name: Create release
         if: steps.version-change.outputs.changed == 'true'
-        uses: ./.github/actions/create-github-release
+        uses: omec-project/.github/.github/actions/create-github-release@main
         with:
           VERSION: ${{ steps.version-change.outputs.version }}
