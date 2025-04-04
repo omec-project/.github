@@ -50,8 +50,8 @@ jobs:
            echo "changed=true" >> $GITHUB_OUTPUT
            echo "version=$version" >> $GITHUB_OUTPUT
           else
-           echo "Invalid version format in VERSION file"
-           exit 1
+           echo "Version change not for release"
+           exit 0
           fi
 
           if [[ $version_before =~ $validate ]]; then
@@ -63,7 +63,7 @@ jobs:
              echo "Version is compatible with the branch"
            else
              echo "Version $version is not compatible with branch version $version_branch"
-             exit 1
+             exit 0
            fi
            if [[ "$major" -ne "$major_b" ]] || [[ "$minor" -ne "$minor_b" ]]; then
              echo "release_branch=true" >> $GITHUB_OUTPUT
@@ -76,6 +76,15 @@ jobs:
 
       - name: Create release
         if: steps.version-change.outputs.changed == 'true'
-        uses: omec-project/.github/.github/actions/create-github-release@main
-        with:
-          VERSION: ${{ steps.version-change.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_OMEC_PAT }}
+        run: |
+          echo "$GITHUB_TOKEN" | gh auth login --with-token
+          if gh release create "${{ inputs.VERSION }}" --generate-notes; then
+            echo "Release ${{ inputs.VERSION }} created ✅" >> "$GITHUB_STEP_SUMMARY"
+            echo "Release ${{ inputs.VERSION }} created ✅"
+          else
+            echo "Failed to create release ${{ inputs.VERSION }} ❌" >> "$GITHUB_STEP_SUMMARY"
+            echo "Failed to create release ${{ inputs.VERSION }} ❌"
+          fi
+          gh auth logout
