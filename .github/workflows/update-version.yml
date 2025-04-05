@@ -1,26 +1,28 @@
-# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Canonical Ltd.
+# SPDX-FileCopyrightText: 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 name: Update Version
 
 on:
   workflow_call:
-
-  workflow_run:
-    workflows:
-      - "Tag GitHub"
-    types:
-      - completed
+    inputs:
+      version:
+        required: true
+        type: string
+      changed:
+        required: true
+        type: string
 
 jobs:
   update-version:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    if: ${{ inputs.changed == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Increment version
         run: |
-          version=${{ github.event.workflow_run.outputs.version }}
+          version=${{ inputs.version }}
           IFS='.' read -r major minor patch <<< "$version"
           patch_update=$((patch+1))
           NEW_VERSION="$major.$minor.$patch_update-dev"
