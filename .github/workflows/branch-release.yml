@@ -1,25 +1,27 @@
-# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Canonical Ltd.
+# SPDX-FileCopyrightText: 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 name: Branch Release
 
 on:
   workflow_call:
-
-  workflow_run:
-    workflows:
-      - "Tag GitHub"
-    types:
-      - completed
+    inputs:
+      release_branch:
+        required: true
+        type: string
+      version_branch:
+        required: true
+        type: string
 
 jobs:
   branch-release:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.outputs.release_branch == 'true' }}
-    env:
-      GITHUB_TOKEN: ${{ secrets.GH_OMEC_PAT }}
+    if: ${{ inputs.release_branch == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: peterjgrainger/action-create-branch@v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_OMEC_PAT }}
         with:
-          branch: "rel-${{ github.event.workflow_run.outputs.version_branch }}"
+          branch: "rel-${{ inputs.version_branch }}"
