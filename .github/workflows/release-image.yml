@@ -1,16 +1,17 @@
-# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 Canonical Ltd.
+# SPDX-FileCopyrightText: 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
 name: Release Image
 
 on:
-  workflow_run:
-    workflows:
-      - "Tag GitHub"
-    types:
-      - completed
-
   workflow_call:
     inputs:
+      version:
+        required: true
+        type: string
+      changed:
+        required: true
+        type: string
       aether_registry:
         description: "Aether Registry URL"
         default: "registry.aetherproject.org/"
@@ -36,9 +37,9 @@ on:
 jobs:
   release-image:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ inputs.changed == 'true' }}
     env:
-      DOCKER_TAG: rel-${{ github.event.workflow_run.outputs.version }}
+      DOCKER_TAG: rel-${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
 
