@@ -37,6 +37,3 @@ jobs:
         run: |
           source ./venv/bin/activate
           python -m unittest ./conf/test_route_control.py
-
-      - name: Clean up virtual environment
-        run: rm -rf venv
