@@ -10,6 +10,11 @@ on:
         required: false
         type: string
         default: ${{ github.ref }}
+      build_directory:
+        description: "Directory where to run the build command from"
+        required: false
+        type: string
+        default: '.'
 
 jobs:
   build:
@@ -25,4 +30,6 @@ jobs:
           cache: true
 
       - name: Build
-        run: go build ./...
+        run: |
+          cd ${{ inputs.build_directory }}
+          go build ./...

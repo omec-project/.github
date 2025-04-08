@@ -10,6 +10,11 @@ on:
         required: false
         type: string
         default: ${{ github.ref }}
+      build_directory:
+        description: "Directory where to run the build command from"
+        required: false
+        type: string
+        default: '.'
 
 jobs:
   docker-build:
@@ -20,4 +25,6 @@ jobs:
           ref: ${{ inputs.branch_name }}
 
       - name: Build Docker image
-        run: make docker-build
+        run: |
+          cd ${{ inputs.build_directory }}
+          make docker-build
