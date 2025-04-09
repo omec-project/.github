@@ -3,14 +3,14 @@
 name: GitHub release and Docker images
 
 on:
-  workflow_run:
-    workflows:
-      - "Tag GitHub"
-    types:
-      - completed
-
   workflow_call:
     inputs:
+      version:
+        required: true
+        type: string
+      changed:
+        required: true
+        type: string
       aether_registry:
         description: "Aether Registry URL"
         default: "registry.aetherproject.org/"
@@ -36,7 +36,7 @@ on:
 jobs:
   release-image:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ inputs.changed == 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -53,7 +53,7 @@ jobs:
 
       - name: Build and Push to Docker Registry for Haswell CPU
         env:
-          DOCKER_TAG: ${{ github.event.workflow_run.outputs.version }}
+          DOCKER_TAG: ${{ inputs.version }}
           DOCKER_REGISTRY: ${{ inputs.docker_registry }}
           DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
           CPU: haswell
@@ -63,7 +63,7 @@ jobs:
 
       - name: Build and Push to Docker Registry for Ivybridge CPU
         env:
-          DOCKER_TAG: ${{ github.event.workflow_run.outputs.version }}-ivybridge
+          DOCKER_TAG: ${{ inputs.version }}-ivybridge
           DOCKER_REGISTRY: ${{ inputs.docker_registry }}
           DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
           CPU: ivybridge
