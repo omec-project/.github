@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: "./..."
+      env_vars:
+        description: "Custom environment variables to set in the go test command"
+        required: false
+        type: string
+        default: ""
 
 jobs:
   unit-tests:
@@ -36,4 +41,4 @@ jobs:
           cache: true
 
       - name: Unit tests
-        run: go test ${{ inputs.test_flags }} ${{inputs.test_directory}}
+        run: ${{ inputs.env_vars }} go test ${{ inputs.test_flags }} ${{inputs.test_directory}}
