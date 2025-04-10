@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Markdown spellcheck
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+
+jobs:
+  check-spelling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
+
+      - name: Check Spelling
+        uses: rojopolis/spellcheck-github-actions@0.48.0
+        with:
+          config_path: .spellcheck.yml
+          task_name: Markdown

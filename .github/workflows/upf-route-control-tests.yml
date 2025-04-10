@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Route control tests
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+
+jobs:
+  route-control-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Create virtual environment
+        run: python -m venv venv
+
+      - name: Install dependencies
+        run: |
+          source ./venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          source ./venv/bin/activate
+          python -m unittest ./conf/test_route_control.py
