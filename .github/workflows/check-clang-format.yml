@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Canonical Ltd.
+name: Clang-format check
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+      clang_format_version:
+        description: "The major version of clang-format that you want to run the check on"
+        required: false
+        type: string
+        default: "12"
+      check_path:
+        description: "The path to the directory in the repo that should be checked for C/C++/Protobuf formatting."
+        required: false
+        type: string
+        default: "."
+      exclude_regex:
+        description: "A regex to exclude files or directories that should not be checked."
+        required: false
+        type: string
+        default: "^$"
+
+jobs:
+  check-spelling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch_name }}
+
+      - name: Clang-format check
+        uses: jidicula/clang-format-action@v4.11.0
+        with:
+          clang-format-version: ${{ inputs.clang_format_version }}
+          check-path: ${{ inputs.check_path }}
+          exclude-regex: ${{ inputs.exclude_regex }}
