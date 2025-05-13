@@ -14,7 +14,7 @@ on:
         type: string
       aether_registry:
         description: "Aether Registry URL"
-        default: "registry.aetherproject.org/"
+        default: "registry.aetherproject.org"
         type: string
       aether_repository:
         description: "Aether Repository"
@@ -22,7 +22,7 @@ on:
         type: string
       docker_registry:
         description: "Docker Registry URL"
-        default: "docker.io/"
+        default: "docker.io"
         type: string
       docker_repository:
         description: "Docker Repository"
@@ -57,7 +57,7 @@ jobs:
 
       - name: Build and Push to Docker Registry
         env:
-          DOCKER_REGISTRY: ${{ inputs.docker_registry }}
+          DOCKER_REGISTRY: ${{ inputs.docker_registry }}/
           DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
         run: |
           make docker-build
@@ -72,7 +72,7 @@ jobs:
 
       - name: Build and Push to Aether Registry
         env:
-          DOCKER_REGISTRY: ${{ inputs.aether_registry }}
+          DOCKER_REGISTRY: ${{ inputs.aether_registry }}/
           DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
         run: |
           make docker-build
