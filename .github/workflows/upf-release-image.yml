@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2025 Intel Corporation
 # Copyright 2025 Canonical Ltd.
-name: Release images
+name: UPF Release images
 
 on:
   workflow_call:
@@ -38,6 +38,9 @@ jobs:
   release-image:
     runs-on: ubuntu-latest
     if: ${{ inputs.changed == 'true' }}
+    strategy:
+      matrix:
+        cpu: [haswell, ivybridge]
     steps:
       - uses: actions/checkout@v4
 
@@ -53,22 +56,12 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build and Push to Docker Registry for Haswell CPU
+      - name: Build and Push to Docker Registry
         env:
-          DOCKER_TAG: ${{ inputs.version }}
+          DOCKER_TAG: ${{ matrix.cpu == 'ivybridge' && format('{0}-ivybridge', inputs.version) || inputs.version }}
           DOCKER_REGISTRY: ${{ inputs.docker_registry }}/
           DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
-          CPU: haswell
-        run: |
-          CPU=$CPU make docker-build
-          make docker-push
-
-      - name: Build and Push to Docker Registry for Ivybridge CPU
-        env:
-          DOCKER_TAG: ${{ inputs.version }}-ivybridge
-          DOCKER_REGISTRY: ${{ inputs.docker_registry }}/
-          DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
-          CPU: ivybridge
+          CPU: ${{ matrix.cpu }}
         run: |
           CPU=$CPU make docker-build
           make docker-push
@@ -82,24 +75,12 @@ jobs:
 
       - name: Build and Push to Aether Registry
         env:
-          DOCKER_TAG: ${{ inputs.version }}
+          DOCKER_TAG: ${{ matrix.cpu == 'ivybridge' && format('{0}-ivybridge', inputs.version) || inputs.version }}
           DOCKER_REGISTRY: ${{ inputs.aether_registry }}/
           DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
-          CPU: haswell
+          CPU: ${{ matrix.cpu }}
         run: |
-          docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
-          docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
-          CPU=$CPU make docker-build
-          make docker-push
-
-      - name: Build and Push to Aether Registry for Ivybridge CPU
-        env:
-          DOCKER_TAG: ${{ inputs.version }}-ivybridge
-          DOCKER_REGISTRY: ${{ inputs.aether_registry }}/
-          DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
-          CPU: ivybridge
-        run: |
-          docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG
-          docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG
+          docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG || true
+          docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-pfcpiface:$DOCKER_TAG || true
           CPU=$CPU make docker-build
           make docker-push
