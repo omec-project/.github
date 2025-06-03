@@ -13,20 +13,23 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.branch_name }}
 
       - name: Setup environment (Hugepages)
-        run: sudo sysctl -w vm.nr_hugepages=512
+        run: |
+          sudo sysctl -w vm.nr_hugepages=512
+          ip link
+          sudo ethtool --offload eth0 rx off tx off
 
       - name: Setup dependencies
         run: |
-          sudo apt-get install -y ccache libbpf0
+          sudo apt-get install -y ccache libbpf-dev libgflags-dev libpcap-dev libgrpc++-dev
           sudo pip3 install -r requirements.txt
-          yes n | ./env/rebuild_images.py focal64
+          yes n | ./env/rebuild_images.py jammy64
           sudo mkdir -p /mnt/huge
           sudo mount -t hugetlbfs nodev /mnt/huge
           export CXX="ccache $VER_CXX"
