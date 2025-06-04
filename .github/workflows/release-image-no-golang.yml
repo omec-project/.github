@@ -1,0 +1,74 @@
+# Copyright 2025 Canonical Ltd.
+# SPDX-FileCopyrightText: 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+name: Release Image (for NO Golang projects)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      changed:
+        required: true
+        type: string
+      aether_registry:
+        description: "Aether Registry URL"
+        default: "registry.aetherproject.org"
+        type: string
+      aether_repository:
+        description: "Aether Repository"
+        default: "sdcore/"
+        type: string
+      docker_registry:
+        description: "Docker Registry URL"
+        default: "docker.io"
+        type: string
+      docker_repository:
+        description: "Docker Repository"
+        default: "omecproject/"
+        type: string
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: "main"
+
+jobs:
+  release-image-no-golang:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.changed == 'true' }}
+    env:
+      DOCKER_TAG: rel-${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ${{ inputs.docker_registry }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and Push to Docker Registry
+        env:
+          DOCKER_REGISTRY: ${{ inputs.docker_registry }}/
+          DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
+        run: |
+          make docker-build
+          make docker-push
+
+      - name: Login to Aether Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ${{ inputs.aether_registry }}
+          username: ${{ secrets.AETHER_REGISTRY_USERNAME }}
+          password: ${{ secrets.AETHER_REGISTRY_PASSWORD }}
+
+      - name: Build and Push to Aether Registry
+        env:
+          DOCKER_REGISTRY: ${{ inputs.aether_registry }}/
+          DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
+        run: |
+          make docker-build
+          make docker-push
