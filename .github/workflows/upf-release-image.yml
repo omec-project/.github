@@ -58,7 +58,7 @@ jobs:
 
       - name: Build and Push to Docker Registry
         env:
-          DOCKER_TAG: ${{ matrix.cpu == 'ivybridge' && format('{0}-ivybridge', inputs.version) || inputs.version }}
+          DOCKER_TAG: ${{ matrix.cpu == 'ivybridge' && format('rel-{0}-ivybridge', inputs.version) || format('rel-{0}', inputs.version) }}
           DOCKER_REGISTRY: ${{ inputs.docker_registry }}/
           DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
           CPU: ${{ matrix.cpu }}
@@ -75,7 +75,7 @@ jobs:
 
       - name: Build and Push to Aether Registry
         env:
-          DOCKER_TAG: ${{ matrix.cpu == 'ivybridge' && format('{0}-ivybridge', inputs.version) || inputs.version }}
+          DOCKER_TAG: ${{ matrix.cpu == 'ivybridge' && format('rel-{0}-ivybridge', inputs.version) || format('rel-{0}', inputs.version) }}
           DOCKER_REGISTRY: ${{ inputs.aether_registry }}/
           DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
           CPU: ${{ matrix.cpu }}
