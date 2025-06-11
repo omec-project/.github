@@ -16,18 +16,20 @@ on:
         type: string
         default: "12"
       check_path:
-        description: "The path to the directory in the repo that should be checked for C/C++/Protobuf formatting."
+        description: |
+          The path to the directory in the repo that should be checked for C/C++/Protobuf formatting.
+          If multiple paths need to be checked, a matrix run is required.
         required: false
         type: string
         default: "."
       exclude_regex:
-        description: "A regex to exclude files or directories that should not be checked."
+        description: "A regular expression (standard POSIX extended regex) to exclude files or directories that should not be checked."
         required: false
         type: string
         default: "^$"
 
 jobs:
-  check-spelling:
+  check-clang-format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +37,7 @@ jobs:
           ref: ${{ inputs.branch_name }}
 
       - name: Clang-format check
-        uses: jidicula/clang-format-action@v4.11.0
+        uses: jidicula/clang-format-action@v4.15.0
         with:
           clang-format-version: ${{ inputs.clang_format_version }}
           check-path: ${{ inputs.check_path }}

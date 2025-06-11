@@ -13,7 +13,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,8 +22,6 @@ jobs:
       - name: Setup environment (Hugepages)
         run: |
           sudo sysctl -w vm.nr_hugepages=512
-          ip link
-          sudo ethtool --offload eth0 rx off tx off
 
       - name: Setup dependencies
         run: |
