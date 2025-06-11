@@ -42,6 +42,7 @@ jobs:
 
       - name: Test BESS
         run: |
+          (cd core && ./all_test --gtest_shuffle)
           coverage run -m unittest discover -v
           python3 bessctl/run_module_tests.py
           sudo python3 bessctl/run_module_tests.py --test_dir bessctl/module_tests/cndp
