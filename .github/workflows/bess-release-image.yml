@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 Intel Corporation
+# Copyright 2025 Canonical Ltd.
+name: Release BESS Image
+
+on:
+  workflow_call:
+    inputs:
+      aether_registry:
+        description: "Aether Registry URL"
+        default: "registry.aetherproject.org/"
+        type: string
+      aether_repository:
+        description: "Aether Repository"
+        default: "sdcore/"
+        type: string
+
+jobs:
+  release-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Aether Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ${{ inputs.aether_registry }}
+          username: ${{ secrets.AETHER_USERNAME }}
+          password: ${{ secrets.AETHER_PASSWORD }}
+
+      - name: Build and Push to Aether Registry
+        env:
+          DOCKER_REGISTRY: ${{ inputs.aether_registry }}
+          DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
+        run: yes y | ./env/rebuild_images.py focal64

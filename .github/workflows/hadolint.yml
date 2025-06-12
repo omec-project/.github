@@ -10,6 +10,16 @@ on:
         required: false
         type: string
         default: ${{ github.ref }}
+      dockerfile:
+        description: "Path of the Dockerfile to scan."
+        required: false
+        type: string
+        default: Dockerfile
+      ignored_rules:
+        description: "Linting rules to ignore."
+        required: false
+        type: string
+        default: DL3008,DL3018
 
 jobs:
   hadolint:
@@ -25,5 +35,5 @@ jobs:
         # DL3008 warning: Pin versions in apt get install (e.g., apt-get install <package>=<version>); and
         # DL3018 warning: Pin versions in apk add (e.g., apk add <package>=<version>)
         with:
-          dockerfile: Dockerfile
-          ignore: DL3008,DL3018
+          dockerfile: ${{ inputs.dockerfile }}
+          ignore: ${{ inputs.ignored_rules }}
