@@ -29,7 +29,7 @@ jobs:
       release_branch: ${{ steps.version-change.outputs.release_branch }}
       version_branch: ${{ steps.version-change.outputs.version_branch }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
