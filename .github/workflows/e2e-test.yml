@@ -117,6 +117,9 @@ jobs:
             {\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/0/imagePullPolicy\", \"value\": \"Never\"}
           ]"
 
+      - name: Sleep time to give the NF time to sync-up with other NFs
+        run: sleep 60
+
       - name: Install GNBSIM
         working-directory: aether-onramp
         run: |
@@ -150,6 +153,7 @@ jobs:
           for pod in $(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
             kubectl logs --all-containers -n "$NAMESPACE" "$pod" > "logs/${pod}.log" 2>&1 || true
           done
+          docker exec gnbsim-1 cat gnbsim.log > logs/gnbsim.log 2>&1
 
       - name: Upload pod logs
         if: always()
