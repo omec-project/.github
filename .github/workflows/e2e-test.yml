@@ -153,7 +153,7 @@ jobs:
           for pod in $(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
             kubectl logs --all-containers -n "$NAMESPACE" "$pod" > "logs/${pod}.log" 2>&1 || true
           done
-          docker exec -ti gnbsim-1 cat gnbsim.log > logs/gnbsim.log 2>&1
+          docker exec gnbsim-1 cat gnbsim.log > logs/gnbsim.log 2>&1
 
       - name: Upload pod logs
         if: always()
