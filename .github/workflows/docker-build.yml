@@ -24,6 +24,11 @@ jobs:
         with:
           ref: ${{ inputs.branch_name }}
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
       - name: Build Docker image
         run: |
           cd ${{ inputs.build_directory }}
