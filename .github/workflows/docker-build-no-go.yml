@@ -25,6 +25,5 @@ jobs:
           ref: ${{ inputs.branch_name }}
 
       - name: Build Docker image
-        run: |
-          cd ${{ inputs.build_directory }}
-          make docker-build
+        run: make docker-build
+        working-directory: ${{ inputs.build_directory }}
