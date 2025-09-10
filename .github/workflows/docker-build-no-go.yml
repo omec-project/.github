@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2024 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+name: Docker Build (No GO)
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+      build_directory:
+        description: "Directory where to run the build command from"
+        required: false
+        type: string
+        default: '.'
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.branch_name }}
+
+      - name: Build Docker image
+        run: make docker-build
+        working-directory: ${{ inputs.build_directory }}
