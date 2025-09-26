@@ -33,4 +33,4 @@ jobs:
         env:
           DOCKER_REGISTRY: ${{ inputs.aether_registry }}
           DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
-        run: yes y | ./env/rebuild_images.py focal64
+        run: yes y | ./env/rebuild_images.py jammy64
