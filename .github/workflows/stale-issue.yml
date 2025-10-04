@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'omec-project'
     steps:
-      - uses: actions/stale@v10.0.0
+      - uses: actions/stale@v10.1.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           stale-issue-message: 'This issue has been stale for  ${{ inputs.days_before_stale }} days and will be closed in ${{ inputs.days_before_close }} days. Comment to keep it open.'
