@@ -8,7 +8,7 @@ SPDX-License-Identifier: Apache-2.0
 This repository contains the GitHub Actions (workflows) used by the SD-Core
 repositories.
 
-## Reach out to us through
+## Reach out to us thorugh
 
-1. #sdcore-dev channel in [ONF Community Slack](https://onf-community.slack.com/)
-2. Raise Github issues
+1. #sdcore-dev channel in [Aether Community Slack](https://aether5g-project.slack.com)
+2. Raise Github [issues](https://github.com/omec-project/.github/issues/new)
