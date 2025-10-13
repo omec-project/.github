@@ -1,0 +1,43 @@
+# Copyright 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+name: Publish docs
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'omec-project'
+    env:
+      BUILD_OUTPUT_PATH: _build/multiversion/
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.11
+
+      - name: Build docs
+        run: make multiversion
+
+      - name: List built files
+        run: ls $BUILD_OUTPUT_PATH*
+
+      - name: rsync deployments
+        uses: burnett01/rsync-deployments@7.1.0
+        with:
+          switches: -rvzh --delete-after --exclude=.git
+          path: $BUILD_OUTPUT_PATH
+          remote_path: /srv/sites/docs.sd-core.opennetworking.org/
+          remote_host: static.opennetworking.org
+          remote_user: ${{ secrets.JENKINS_USERNAME }}
+          remote_key: ${{ secrets.JENKINS_SSHKEY }}
+          remote_key_pass: ${{ secrets.JENKINS_PASSPHRASE }}
