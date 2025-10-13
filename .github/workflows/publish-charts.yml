@@ -22,6 +22,8 @@ jobs:
       UMBRELLA_CHARTS: ./sdcore-helm-charts
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.branch_name }}
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
