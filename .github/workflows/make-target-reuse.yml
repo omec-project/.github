@@ -1,0 +1,31 @@
+# Copyright 2025 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+name: Make target
+
+on:
+  workflow_call:
+    inputs:
+      branch_name:
+        description: "Name of the branch to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+      target:
+        description: "make target to run"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  make-target:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.branch_name }}
+
+      - uses: actions/setup-go@v6
+        with:
+          python-version: 3.11
+
+      - run: make ${{ inputs.target }}
