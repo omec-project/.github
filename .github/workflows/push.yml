@@ -9,12 +9,12 @@ on:
 
 jobs:
   tag-github:
-    uses: ./.github/.github/workflows/tag-github.yml
+    uses: ./.github/workflows/tag-github.yml
     secrets: inherit
 
   update-version:
     needs: tag-github
-    uses: ./.github/.github/workflows/update-version.yml
+    uses: ./.github/workflows/update-version.yml
     with:
       changed: ${{ needs.tag-github.outputs.changed }}
       version: ${{ needs.tag-github.outputs.version }}
@@ -22,7 +22,7 @@ jobs:
 
   branch-release:
     needs: tag-github
-    uses: ./.github/.github/workflows/branch-release.yml
+    uses: ./.github/workflows/branch-release.yml
     with:
       release_branch: ${{ needs.tag-github.outputs.release_branch }}
       version_branch: ${{ needs.tag-github.outputs.version_branch }}
