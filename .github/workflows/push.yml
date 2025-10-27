@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 Intel Corporation
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "VERSION"
+
+jobs:
+  tag-github:
+    uses: ./.github/.github/workflows/tag-github.yml
+    secrets: inherit
+
+  update-version:
+    needs: tag-github
+    uses: ./.github/.github/workflows/update-version.yml
+    with:
+      changed: ${{ needs.tag-github.outputs.changed }}
+      version: ${{ needs.tag-github.outputs.version }}
+    secrets: inherit
+
+  branch-release:
+    needs: tag-github
+    uses: ./.github/.github/workflows/branch-release.yml
+    with:
+      release_branch: ${{ needs.tag-github.outputs.release_branch }}
+      version_branch: ${{ needs.tag-github.outputs.version_branch }}
+    secrets: inherit
