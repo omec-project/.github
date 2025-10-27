@@ -25,6 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: ${{ inputs.branch_name }}
           persist-credentials: false
 
       - name: Run analysis
