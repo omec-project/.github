@@ -15,7 +15,6 @@ permissions: read-all
 
 jobs:
   score-analysis:
-    name: Scorecard analysis
     runs-on: ubuntu-latest
     if: github.repository_owner == 'omec-project'
     permissions:
@@ -42,7 +41,8 @@ jobs:
           path: results.sarif
           retention-days: 5
 
-      - name: Upload to code-scanning
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: results.sarif
+      # Disabling upload to code-scanning
+      # - name: Upload to code-scanning
+      #   uses: github/codeql-action/upload-sarif@v3
+      #   with:
+      #     sarif_file: results.sarif
