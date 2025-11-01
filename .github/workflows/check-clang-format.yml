@@ -37,7 +37,7 @@ jobs:
           ref: ${{ inputs.branch_name }}
 
       - name: Clang-format check
-        uses: jidicula/clang-format-action@v4.15.0
+        uses: jidicula/clang-format-action@v4.16.0
         with:
           clang-format-version: ${{ inputs.clang_format_version }}
           check-path: ${{ inputs.check_path }}
