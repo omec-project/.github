@@ -19,7 +19,7 @@ jobs:
       NAMESPACE: aether-5gc
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Update and install dependencies
         run: |
