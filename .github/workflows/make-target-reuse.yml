@@ -24,8 +24,8 @@ jobs:
         with:
           ref: ${{ inputs.branch_name }}
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-python@v6
         with:
-          python-version: 3.11
+          python-version: '3.11'
 
       - run: make ${{ inputs.target }}
