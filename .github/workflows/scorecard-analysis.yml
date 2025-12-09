@@ -31,7 +31,7 @@ permissions: read-all
 jobs:
   score-analysis:
     runs-on: ubuntu-latest
-    if: contains(inputs.allowed_orgs, github.repository_owner)
+    if: contains(fromJSON(format('["{0}"]', join('","', split(inputs.allowed_orgs, ',')))), github.repository_owner)
     permissions:
       # Needed to upload the results to code-scanning dashboard.
       security-events: write
