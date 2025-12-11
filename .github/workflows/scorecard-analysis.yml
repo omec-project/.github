@@ -20,8 +20,8 @@ on:
         required: false
         type: number
         default: 5
-      allowed_orgs:
-        description: "Comma-separated list of allowed repository owners"
+      allowed_org:
+        description: "Allowed repository owner organization"
         required: false
         type: string
         default: "omec-project"
@@ -31,7 +31,7 @@ permissions: read-all
 jobs:
   score-analysis:
     runs-on: ubuntu-latest
-    if: contains(fromJSON(format('["{0}"]', join('","', split(inputs.allowed_orgs, ',')))), github.repository_owner)
+    if: github.repository_owner == inputs.allowed_org
     permissions:
       # Needed to upload the results to code-scanning dashboard.
       security-events: write
