@@ -10,6 +10,11 @@ on:
         required: false
         type: string
         default: ${{ github.ref }}
+      python_version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.12"
       target:
         description: "make target to run"
         required: false
@@ -26,6 +31,6 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: ${{ inputs.python_version }}
 
       - run: make ${{ inputs.target }}
