@@ -1,0 +1,50 @@
+# Copyright 2026 Intel Corporation
+# SPDX-FileCopyrightText: 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+name: SBOM (source)
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref/branch/tag/SHA to checkout"
+        required: false
+        type: string
+        default: ${{ github.ref }}
+      sbom_format:
+        description: "SBOM format (spdx-json, cyclonedx-json, etc.)"
+        required: false
+        type: string
+        default: spdx-json
+      artifact_name:
+        description: "Workflow artifact name for the SBOM"
+        required: false
+        type: string
+        default: sbom-source.spdx.json
+      path:
+        description: "Path to scan"
+        required: false
+        type: string
+        default: "."
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    permissions:
+      # sbom-action uploads an artifact (and can upload release assets if enabled),
+      # so contents write is the safe baseline. :contentReference[oaicite:1]{index=1}
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Generate SBOM (Syft)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ${{ inputs.path }}
+          format: ${{ inputs.sbom_format }}
+          artifact-name: ${{ inputs.artifact_name }}
+          upload-release-assets: false
