@@ -31,9 +31,10 @@ jobs:
   sbom:
     runs-on: ubuntu-latest
     permissions:
-      # sbom-action uploads an artifact (and can upload release assets if enabled),
-      # so contents write is the safe baseline. :contentReference[oaicite:1]{index=1}
-      contents: write
+      # Only read access is required for source SBOM generation and
+      # uploading workflow artifacts; write access is only needed
+      # when publishing SBOMs as release assets.
+      contents: read
 
     steps:
       - uses: actions/checkout@v6
