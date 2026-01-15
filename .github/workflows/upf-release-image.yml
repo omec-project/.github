@@ -1,6 +1,6 @@
-# SPDX-License-Identifier: Apache-2.0
-# SPDX-FileCopyrightText: 2025 Intel Corporation
+# SPDX-FileCopyrightText: 2025-present Intel Corporation
 # Copyright 2025 Canonical Ltd.
+# SPDX-License-Identifier: Apache-2.0
 name: UPF Release images
 
 on:
@@ -12,14 +12,6 @@ on:
       changed:
         required: true
         type: string
-      aether_registry:
-        description: "Aether Registry URL"
-        default: "registry.aetherproject.org"
-        type: string
-      aether_repository:
-        description: "Aether Repository"
-        default: "sdcore/"
-        type: string
       docker_registry:
         description: "Docker Registry URL"
         default: "docker.io"
@@ -27,6 +19,10 @@ on:
       docker_repository:
         description: "Docker Repository"
         default: "omecproject/"
+        type: string
+      github_registry:
+        description: "GitHub Container Registry URL"
+        default: "ghcr.io"
         type: string
       branch_name:
         description: "Name of the branch to checkout"
@@ -50,13 +46,20 @@ jobs:
           cache: true
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3.6.0
+        uses: docker/login-action@v3
         with:
           registry: ${{ inputs.docker_registry }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build and Push to Docker Registry
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.github_registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push to Docker Hub
         env:
           DOCKER_TAG: ${{ matrix.cpu == 'ivybridge' && format('rel-{0}-ivybridge', inputs.version) || format('rel-{0}', inputs.version) }}
           DOCKER_REGISTRY: ${{ inputs.docker_registry }}/
@@ -66,18 +69,11 @@ jobs:
           CPU=$CPU make docker-build
           make docker-push
 
-      - name: Login to Aether Registry
-        uses: docker/login-action@v3.6.0
-        with:
-          registry: ${{ inputs.aether_registry }}
-          username: ${{ secrets.AETHER_REGISTRY_USERNAME }}
-          password: ${{ secrets.AETHER_REGISTRY_PASSWORD }}
-
-      - name: Build and Push to Aether Registry
+      - name: Build and Push to GitHub Container Registry
         env:
           DOCKER_TAG: ${{ matrix.cpu == 'ivybridge' && format('rel-{0}-ivybridge', inputs.version) || format('rel-{0}', inputs.version) }}
-          DOCKER_REGISTRY: ${{ inputs.aether_registry }}/
-          DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
+          DOCKER_REGISTRY: ${{ inputs.github_registry }}/
+          DOCKER_REPOSITORY: ${{ github.repository_owner }}/
           CPU: ${{ matrix.cpu }}
         run: |
           docker pull ${DOCKER_REGISTRY}${DOCKER_REPOSITORY}upf-epc-bess:$DOCKER_TAG || true

@@ -1,5 +1,5 @@
 # Copyright 2025 Canonical Ltd.
-# SPDX-FileCopyrightText: 2025 Intel Corporation
+# SPDX-FileCopyrightText: 2025-present Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 name: Release Image
 
@@ -12,14 +12,6 @@ on:
       changed:
         required: true
         type: string
-      aether_registry:
-        description: "Aether Registry URL"
-        default: "registry.aetherproject.org"
-        type: string
-      aether_repository:
-        description: "Aether Repository"
-        default: "sdcore/"
-        type: string
       docker_registry:
         description: "Docker Registry URL"
         default: "docker.io"
@@ -27,6 +19,10 @@ on:
       docker_repository:
         description: "Docker Repository"
         default: "omecproject/"
+        type: string
+      github_registry:
+        description: "GitHub Container Registry URL"
+        default: "ghcr.io"
         type: string
       branch_name:
         description: "Name of the branch to checkout"
@@ -43,19 +39,39 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v6
+      - name: Check for Go project
+        id: check-go
+        run: |
+          if [ -f "go.mod" ]; then
+            echo "go-project=true" >> $GITHUB_OUTPUT
+            echo "Go project detected"
+          else
+            echo "go-project=false" >> $GITHUB_OUTPUT
+            echo "No Go project detected"
+          fi
+
+      - name: Setup Go
+        if: steps.check-go.outputs.go-project == 'true'
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache: true
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v3.6.0
+        uses: docker/login-action@v3
         with:
           registry: ${{ inputs.docker_registry }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build and Push to Docker Registry
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.github_registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push to Docker Hub
         env:
           DOCKER_REGISTRY: ${{ inputs.docker_registry }}/
           DOCKER_REPOSITORY: ${{ inputs.docker_repository }}
@@ -63,17 +79,10 @@ jobs:
           make docker-build
           make docker-push
 
-      - name: Login to Aether Registry
-        uses: docker/login-action@v3.6.0
-        with:
-          registry: ${{ inputs.aether_registry }}
-          username: ${{ secrets.AETHER_REGISTRY_USERNAME }}
-          password: ${{ secrets.AETHER_REGISTRY_PASSWORD }}
-
-      - name: Build and Push to Aether Registry
+      - name: Build and Push to GitHub Container Registry
         env:
-          DOCKER_REGISTRY: ${{ inputs.aether_registry }}/
-          DOCKER_REPOSITORY: ${{ inputs.aether_repository }}
+          DOCKER_REGISTRY: ${{ inputs.github_registry }}/
+          DOCKER_REPOSITORY: ${{ github.repository_owner }}/
         run: |
           make docker-build
           make docker-push

@@ -20,6 +20,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'omec-project'
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     env:
       BUILD_OUTPUT_PATH: _build/multiversion/
     steps:
@@ -36,15 +42,16 @@ jobs:
         run: make multiversion
 
       - name: List built files
-        run: ls $BUILD_OUTPUT_PATH*
+        run: ls -la $BUILD_OUTPUT_PATH
 
-      - name: rsync deployments
-        uses: burnett01/rsync-deployments@8.0.3
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          switches: -rvzh --delete-after --exclude=.git
           path: $BUILD_OUTPUT_PATH
-          remote_path: /srv/sites/docs.sd-core.opennetworking.org/
-          remote_host: static.opennetworking.org
-          remote_user: ${{ secrets.JENKINS_USERNAME }}
-          remote_key: ${{ secrets.JENKINS_SSHKEY }}
-          remote_key_pass: ${{ secrets.JENKINS_PASSPHRASE }}
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
