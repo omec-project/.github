@@ -36,7 +36,6 @@ jobs:
           committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
           signoff: true
           branch: version-update
-          delete-branch: true
           title: Update version
           body: |
             Update VERSION file
