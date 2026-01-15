@@ -90,9 +90,17 @@ jobs:
             if [[ -f "$dir/Chart.yaml" ]] && [[ "$dir" != "${{ env.UMBRELLA_CHARTS }}" ]]; then
               echo "🔄 Processing chart: $dir"
 
-              # Extract chart info first
-              CHART_NAME=$(helm show chart "$dir" | grep '^name:' | awk '{print $2}' | tr -d '\r')
-              CHART_VERSION=$(helm show chart "$dir" | grep '^version:' | awk '{print $2}' | tr -d '\r')
+              # Execute helm show chart once and store the output
+              CHART_INFO=$(helm show chart "$dir")
+              if [ $? -ne 0 ] || [ -z "$CHART_INFO" ]; then
+                echo "❌ Failed to read chart information from $dir"
+                FAILURE_COUNT=$((FAILURE_COUNT + 1))
+                continue
+              fi
+
+              # Extract chart name and version from the stored output
+              CHART_NAME=$(echo "$CHART_INFO" | grep '^name:' | awk '{print $2}' | tr -d '\r')
+              CHART_VERSION=$(echo "$CHART_INFO" | grep '^version:' | awk '{print $2}' | tr -d '\r')
 
               if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
                 echo "❌ Could not extract chart name or version from $dir"
@@ -153,9 +161,16 @@ jobs:
         run: |
           echo "🔄 Processing umbrella chart: ${{ env.UMBRELLA_CHARTS }}"
 
-          # Extract chart info first
-          CHART_NAME=$(helm show chart "${{ env.UMBRELLA_CHARTS }}" | grep '^name:' | awk '{print $2}' | tr -d '\r')
-          CHART_VERSION=$(helm show chart "${{ env.UMBRELLA_CHARTS }}" | grep '^version:' | awk '{print $2}' | tr -d '\r')
+          # Execute helm show chart once and store the output
+          CHART_INFO=$(helm show chart "${{ env.UMBRELLA_CHARTS }}")
+          if [ $? -ne 0 ] || [ -z "$CHART_INFO" ]; then
+            echo "❌ Failed to read umbrella chart information"
+            exit 1
+          fi
+
+          # Extract chart name and version from the stored output
+          CHART_NAME=$(echo "$CHART_INFO" | grep '^name:' | awk '{print $2}' | tr -d '\r')
+          CHART_VERSION=$(echo "$CHART_INFO" | grep '^version:' | awk '{print $2}' | tr -d '\r')
 
           if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
             echo "❌ Could not extract umbrella chart name or version"
