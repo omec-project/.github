@@ -10,15 +10,18 @@ on:
         required: false
         type: string
         default: ${{ github.ref }}
+      registry:
+        description: "Container registry URL"
+        required: false
+        type: string
+        default: "ghcr.io"
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     if: github.repository_owner == 'omec-project'
     env:
-      CHARTS_REPO_URL: https://charts.aetherproject.org
       CHARTS_DIR: charts
-      REF_CHARTS_DIR: charts-ref
       UMBRELLA_CHARTS: ./sdcore-helm-charts
     steps:
       - uses: actions/checkout@v6
@@ -29,66 +32,44 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: latest
-          token: ${{ secrets.GH_OMEC_PAT }}
 
-      - name: Get current Index.yaml
-        run: |
-          rm -rf ${{ env.REF_CHARTS_DIR }} && mkdir -p ${{ env.REF_CHARTS_DIR }}
-          curl -o ${{ env.REF_CHARTS_DIR }}/index.yaml ${{ env.CHARTS_REPO_URL }}/index.yaml
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Find all Charts and Package them
+      - name: Find and package individual charts
         run: |
           rm -rf ${{ env.CHARTS_DIR }} && mkdir -p ${{ env.CHARTS_DIR }}
+
           for dir in $(find . -maxdepth 1 -mindepth 1 -type d); do
-            if [[ -f "$dir/Chart.yaml" ]] && [[ "$dir" != ${{ env.UMBRELLA_CHARTS }} ]]; then
-              echo "Packaging charts for: $dir"
+            if [[ -f "$dir/Chart.yaml" ]] && [[ "$dir" != "${{ env.UMBRELLA_CHARTS }}" ]]; then
+              echo "Processing chart: $dir"
               helm dependency update "$dir"
               helm package "$dir" --destination ${{ env.CHARTS_DIR }}
-            fi
-          done
-          helm repo index ${{ env.CHARTS_DIR }} --url ${{ env.CHARTS_REPO_URL }} --merge ${{ env.REF_CHARTS_DIR }}/index.yaml
-
-      - name: Remove not "updated" local Charts (version has not changed)
-        working-directory: ${{ env.CHARTS_DIR }}
-        run: |
-          for file in *.tgz; do
-            if grep -q "${{ env.CHARTS_REPO_URL }}/$file" "../${{ env.REF_CHARTS_DIR }}/index.yaml"; then
-              echo "Not publishing $file because it is already in ${{ env.CHARTS_REPO_URL }}/index.yaml"
-              rm $file
+              CHART_NAME=$(helm show chart "$dir" | grep '^name:' | awk '{print $2}')
+              CHART_VERSION=$(helm show chart "$dir" | grep '^version:' | awk '{print $2}')
+              echo "Publishing $CHART_NAME:$CHART_VERSION to OCI registry"
+              helm push "${{ env.CHARTS_DIR }}/${CHART_NAME}-${CHART_VERSION}.tgz" \
+                oci://${{ inputs.registry }}/${{ github.repository_owner }}
             fi
           done
 
-      - name: rsync deployments
-        uses: burnett01/rsync-deployments@8.0.3
-        with:
-          switches: -avh
-          path: ${{ env.CHARTS_DIR }}/
-          remote_path: /srv/sites/charts.aetherproject.org/
-          remote_host: static.opennetworking.org
-          remote_user: ${{ secrets.JENKINS_USERNAME }}
-          remote_key: ${{ secrets.JENKINS_SSHKEY }}
-          remote_key_pass: ${{ secrets.JENKINS_PASSPHRASE }}
-
-      - name: Get current Index.yaml
+      - name: Package and publish umbrella chart
+        if: hashFiles('./sdcore-helm-charts/Chart.yaml') != ''
         run: |
-          rm -rf ${{ env.REF_CHARTS_DIR }} && mkdir -p ${{ env.REF_CHARTS_DIR }}
-          curl -o ${{ env.REF_CHARTS_DIR }}/index.yaml ${{ env.CHARTS_REPO_URL }}/index.yaml
-
-      - name: Find all Charts and Package them
-        run: |
-          rm -rf ${{ env.CHARTS_DIR }} && mkdir -p ${{ env.CHARTS_DIR }}
-          echo "Packaging charts for: ${{ env.UMBRELLA_CHARTS }}"
+          echo "Processing umbrella chart: ${{ env.UMBRELLA_CHARTS }}"
           helm dependency update "${{ env.UMBRELLA_CHARTS }}"
           helm package "${{ env.UMBRELLA_CHARTS }}" --destination ${{ env.CHARTS_DIR }}
-          helm repo index ${{ env.CHARTS_DIR }} --url ${{ env.CHARTS_REPO_URL }} --merge ${{ env.REF_CHARTS_DIR }}/index.yaml
+          CHART_NAME=$(helm show chart "${{ env.UMBRELLA_CHARTS }}" | grep '^name:' | awk '{print $2}')
+          CHART_VERSION=$(helm show chart "${{ env.UMBRELLA_CHARTS }}" | grep '^version:' | awk '{print $2}')
+          echo "Publishing umbrella chart $CHART_NAME:$CHART_VERSION to OCI registry"
+          helm push "${{ env.CHARTS_DIR }}/${CHART_NAME}-${CHART_VERSION}.tgz" \
+            oci://${{ inputs.registry }}/${{ github.repository_owner }}
 
-      - name: rsync deployments
-        uses: burnett01/rsync-deployments@8.0.3
-        with:
-          switches: -avh
-          path: ${{ env.CHARTS_DIR }}/
-          remote_path: /srv/sites/charts.aetherproject.org/
-          remote_host: static.opennetworking.org
-          remote_user: ${{ secrets.JENKINS_USERNAME }}
-          remote_key: ${{ secrets.JENKINS_SSHKEY }}
-          remote_key_pass: ${{ secrets.JENKINS_PASSPHRASE }}
+      - name: List published charts
+        run: |
+          echo "Charts published to ${{ inputs.registry }}/${{ github.repository_owner }}:"
+          ls -la ${{ env.CHARTS_DIR }}/*.tgz 2>/dev/null || echo "No chart packages found"
