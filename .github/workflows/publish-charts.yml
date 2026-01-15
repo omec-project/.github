@@ -40,7 +40,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Find and package individual charts
+      - name: Find, package and publish all charts
         run: |
           # Create unique temporary directory
           TEMP_DIR=$(mktemp -d -t helm-charts-XXXXXX)
@@ -54,10 +54,6 @@ jobs:
             fi
           }
           trap cleanup EXIT INT TERM
-
-          # Export for use in functions and make available to subsequent steps
-          export TEMP_DIR
-          echo "TEMP_DIR=$TEMP_DIR" >> $GITHUB_ENV
 
           rm -rf ${{ env.CHARTS_DIR }} && mkdir -p ${{ env.CHARTS_DIR }}
 
@@ -86,65 +82,86 @@ jobs:
             fi
           }
 
+          # Function to process a chart (individual or umbrella)
+          process_chart() {
+            local chart_dir="$1"
+            local chart_type="$2"  # "individual" or "umbrella"
+
+            echo "🔄 Processing $chart_type chart: $chart_dir"
+
+            # Execute helm show chart once and store the output
+            CHART_INFO=$(helm show chart "$chart_dir")
+            if [ $? -ne 0 ] || [ -z "$CHART_INFO" ]; then
+              echo "❌ Failed to read chart information from $chart_dir"
+              FAILURE_COUNT=$((FAILURE_COUNT + 1))
+              return 1
+            fi
+
+            # Extract chart name and version from the stored output
+            CHART_NAME=$(echo "$CHART_INFO" | grep '^name:' | awk '{print $2}' | tr -d '\r')
+            CHART_VERSION=$(echo "$CHART_INFO" | grep '^version:' | awk '{print $2}' | tr -d '\r')
+
+            if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
+              echo "❌ Could not extract chart name or version from $chart_dir"
+              FAILURE_COUNT=$((FAILURE_COUNT + 1))
+              return 1
+            fi
+
+            # Check if chart already exists
+            if check_chart_exists "$CHART_NAME" "$CHART_VERSION"; then
+              echo "⏭️  Skipping $chart_type chart $CHART_NAME:$CHART_VERSION (already exists)"
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              return 0
+            fi
+
+            # Update dependencies
+            if ! helm dependency update "$chart_dir"; then
+              echo "❌ Failed to update dependencies for $chart_dir"
+              FAILURE_COUNT=$((FAILURE_COUNT + 1))
+              return 1
+            fi
+
+            # Package chart
+            if ! helm package "$chart_dir" --destination ${{ env.CHARTS_DIR }}; then
+              echo "❌ Failed to package chart $chart_dir"
+              FAILURE_COUNT=$((FAILURE_COUNT + 1))
+              return 1
+            fi
+
+            echo "📦 Publishing $chart_type chart $CHART_NAME:$CHART_VERSION to OCI registry"
+
+            # Push chart
+            if helm push "${{ env.CHARTS_DIR }}/${CHART_NAME}-${CHART_VERSION}.tgz" \
+              "oci://${{ inputs.registry }}/${{ github.repository_owner }}"; then
+              echo "✅ Successfully pushed $chart_type chart $CHART_NAME:$CHART_VERSION"
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              return 0
+            else
+              echo "❌ Failed to push $chart_type chart $CHART_NAME:$CHART_VERSION"
+              FAILURE_COUNT=$((FAILURE_COUNT + 1))
+              return 1
+            fi
+          }
+
+          # Process individual charts
+          echo "🚀 Starting individual charts processing..."
           for dir in $(find . -maxdepth 1 -mindepth 1 -type d); do
             if [[ -f "$dir/Chart.yaml" ]] && [[ "$dir" != "${{ env.UMBRELLA_CHARTS }}" ]]; then
-              echo "🔄 Processing chart: $dir"
-
-              # Execute helm show chart once and store the output
-              CHART_INFO=$(helm show chart "$dir")
-              if [ $? -ne 0 ] || [ -z "$CHART_INFO" ]; then
-                echo "❌ Failed to read chart information from $dir"
-                FAILURE_COUNT=$((FAILURE_COUNT + 1))
-                continue
-              fi
-
-              # Extract chart name and version from the stored output
-              CHART_NAME=$(echo "$CHART_INFO" | grep '^name:' | awk '{print $2}' | tr -d '\r')
-              CHART_VERSION=$(echo "$CHART_INFO" | grep '^version:' | awk '{print $2}' | tr -d '\r')
-
-              if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
-                echo "❌ Could not extract chart name or version from $dir"
-                FAILURE_COUNT=$((FAILURE_COUNT + 1))
-                continue
-              fi
-
-              # Check if chart already exists
-              if check_chart_exists "$CHART_NAME" "$CHART_VERSION"; then
-                echo "⏭️  Skipping $CHART_NAME:$CHART_VERSION (already exists)"
-                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-                continue
-              fi
-
-              # Update dependencies
-              if ! helm dependency update "$dir"; then
-                echo "❌ Failed to update dependencies for $dir"
-                FAILURE_COUNT=$((FAILURE_COUNT + 1))
-                continue
-              fi
-
-              # Package chart
-              if ! helm package "$dir" --destination ${{ env.CHARTS_DIR }}; then
-                echo "❌ Failed to package chart $dir"
-                FAILURE_COUNT=$((FAILURE_COUNT + 1))
-                continue
-              fi
-
-              echo "📦 Publishing $CHART_NAME:$CHART_VERSION to OCI registry"
-
-              # Push chart
-              if helm push "${{ env.CHARTS_DIR }}/${CHART_NAME}-${CHART_VERSION}.tgz" \
-                "oci://${{ inputs.registry }}/${{ github.repository_owner }}"; then
-                echo "✅ Successfully pushed $CHART_NAME:$CHART_VERSION"
-                SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
-              else
-                echo "❌ Failed to push $CHART_NAME:$CHART_VERSION"
-                FAILURE_COUNT=$((FAILURE_COUNT + 1))
-              fi
+              process_chart "$dir" "individual"
             fi
           done
 
+          # Process umbrella chart
           echo ""
-          echo "📊 Summary:"
+          echo "🚀 Starting umbrella chart processing..."
+          if [[ -f "${{ env.UMBRELLA_CHARTS }}/Chart.yaml" ]]; then
+            process_chart "${{ env.UMBRELLA_CHARTS }}" "umbrella"
+          else
+            echo "ℹ️  No umbrella chart found at ${{ env.UMBRELLA_CHARTS }}"
+          fi
+
+          echo ""
+          echo "📊 Final Summary:"
           echo "  ✅ Successfully published: $SUCCESS_COUNT"
           echo "  ⏭️  Skipped (already exists): $SKIPPED_COUNT"
           echo "  ❌ Failed: $FAILURE_COUNT"
@@ -154,57 +171,8 @@ jobs:
           if [ "$FAILURE_COUNT" -gt 0 ]; then
             echo "❌ Workflow failed due to $FAILURE_COUNT chart(s) failing to publish"
             exit 1
-          fi
-
-      - name: Package and publish umbrella chart
-        if: hashFiles('./sdcore-helm-charts/Chart.yaml') != ''
-        run: |
-          echo "🔄 Processing umbrella chart: ${{ env.UMBRELLA_CHARTS }}"
-
-          # Execute helm show chart once and store the output
-          CHART_INFO=$(helm show chart "${{ env.UMBRELLA_CHARTS }}")
-          if [ $? -ne 0 ] || [ -z "$CHART_INFO" ]; then
-            echo "❌ Failed to read umbrella chart information"
-            exit 1
-          fi
-
-          # Extract chart name and version from the stored output
-          CHART_NAME=$(echo "$CHART_INFO" | grep '^name:' | awk '{print $2}' | tr -d '\r')
-          CHART_VERSION=$(echo "$CHART_INFO" | grep '^version:' | awk '{print $2}' | tr -d '\r')
-
-          if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
-            echo "❌ Could not extract umbrella chart name or version"
-            exit 1
-          fi
-
-          # Check if umbrella chart already exists using the shared temp directory
-          echo "🔍 Checking if umbrella chart $CHART_NAME:$CHART_VERSION exists..."
-          if helm pull "oci://${{ inputs.registry }}/${{ github.repository_owner }}/$CHART_NAME" --version "$CHART_VERSION" --destination "$TEMP_DIR" >/dev/null 2>&1; then
-            echo "⏭️  Umbrella chart $CHART_NAME:$CHART_VERSION already exists, skipping"
-            # Clean up the downloaded file
-            rm -f "$TEMP_DIR/$CHART_NAME-$CHART_VERSION.tgz" 2>/dev/null || true
-            exit 0
-          fi
-
-          echo "✨ Umbrella chart $CHART_NAME:$CHART_VERSION does not exist, will publish"
-
-          if ! helm dependency update "${{ env.UMBRELLA_CHARTS }}"; then
-            echo "❌ Failed to update umbrella chart dependencies"
-            exit 1
-          fi
-
-          if ! helm package "${{ env.UMBRELLA_CHARTS }}" --destination ${{ env.CHARTS_DIR }}; then
-            echo "❌ Failed to package umbrella chart"
-            exit 1
-          fi
-
-          echo "📦 Publishing umbrella chart $CHART_NAME:$CHART_VERSION to OCI registry"
-          if helm push "${{ env.CHARTS_DIR }}/${CHART_NAME}-${CHART_VERSION}.tgz" \
-            "oci://${{ inputs.registry }}/${{ github.repository_owner }}"; then
-            echo "✅ Successfully pushed umbrella chart $CHART_NAME:$CHART_VERSION"
           else
-            echo "❌ Failed to push umbrella chart $CHART_NAME:$CHART_VERSION"
-            exit 1
+            echo "🎉 All charts processed successfully!"
           fi
 
       - name: List published charts
