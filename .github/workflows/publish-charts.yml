@@ -44,32 +44,123 @@ jobs:
         run: |
           rm -rf ${{ env.CHARTS_DIR }} && mkdir -p ${{ env.CHARTS_DIR }}
 
+          SUCCESS_COUNT=0
+          SKIPPED_COUNT=0
+          FAILURE_COUNT=0
+
+          # Function to check if chart version exists
+          check_chart_exists() {
+            local chart_name=$1
+            local chart_version=$2
+            local registry_url="oci://${{ inputs.registry }}/${{ github.repository_owner }}"
+
+            echo "🔍 Checking if $chart_name:$chart_version exists..."
+
+            # Try to pull the chart (this will fail if it doesn't exist)
+            if helm pull "$registry_url/$chart_name" --version "$chart_version" --destination /tmp >/dev/null 2>&1; then
+              echo "📦 Chart $chart_name:$chart_version already exists"
+              rm -f /tmp/$chart_name-$chart_version.tgz 2>/dev/null
+              return 0  # exists
+            else
+              echo "✨ Chart $chart_name:$chart_version does not exist, will publish"
+              return 1  # does not exist
+            fi
+          }
+
           for dir in $(find . -maxdepth 1 -mindepth 1 -type d); do
             if [[ -f "$dir/Chart.yaml" ]] && [[ "$dir" != "${{ env.UMBRELLA_CHARTS }}" ]]; then
-              echo "Processing chart: $dir"
-              helm dependency update "$dir"
-              helm package "$dir" --destination ${{ env.CHARTS_DIR }}
+              echo "🔄 Processing chart: $dir"
+
+              # Extract chart info first
               CHART_NAME=$(helm show chart "$dir" | grep '^name:' | awk '{print $2}')
               CHART_VERSION=$(helm show chart "$dir" | grep '^version:' | awk '{print $2}')
-              echo "Publishing $CHART_NAME:$CHART_VERSION to OCI registry"
-              helm push "${{ env.CHARTS_DIR }}/${CHART_NAME}-${CHART_VERSION}.tgz" \
-                oci://${{ inputs.registry }}/${{ github.repository_owner }}
+
+              if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
+                echo "❌ Could not extract chart name or version from $dir"
+                ((FAILURE_COUNT++))
+                continue
+              fi
+
+              # Check if chart already exists
+              if check_chart_exists "$CHART_NAME" "$CHART_VERSION"; then
+                echo "⏭️  Skipping $CHART_NAME:$CHART_VERSION (already exists)"
+                ((SKIPPED_COUNT++))
+                continue
+              fi
+
+              # Update dependencies
+              if ! helm dependency update "$dir"; then
+                echo "❌ Failed to update dependencies for $dir"
+                ((FAILURE_COUNT++))
+                continue
+              fi
+
+              # Package chart
+              if ! helm package "$dir" --destination ${{ env.CHARTS_DIR }}; then
+                echo "❌ Failed to package chart $dir"
+                ((FAILURE_COUNT++))
+                continue
+              fi
+
+              echo "📦 Publishing $CHART_NAME:$CHART_VERSION to OCI registry"
+
+              # Push chart
+              if helm push "${{ env.CHARTS_DIR }}/${CHART_NAME}-${CHART_VERSION}.tgz" \
+                oci://${{ inputs.registry }}/${{ github.repository_owner }}; then
+                echo "✅ Successfully pushed $CHART_NAME:$CHART_VERSION"
+                ((SUCCESS_COUNT++))
+              else
+                echo "❌ Failed to push $CHART_NAME:$CHART_VERSION"
+                ((FAILURE_COUNT++))
+              fi
             fi
           done
+
+          echo ""
+          echo "📊 Summary:"
+          echo "  ✅ Successfully published: $SUCCESS_COUNT"
+          echo "  ⏭️  Skipped (already exists): $SKIPPED_COUNT"
+          echo "  ❌ Failed: $FAILURE_COUNT"
+
+          # Only fail if there were actual failures (not skips)
+          if [ $FAILURE_COUNT -gt 0 ]; then
+            echo "❌ Workflow failed due to $FAILURE_COUNT chart(s) failing to publish"
+            exit 1
+          fi
 
       - name: Package and publish umbrella chart
         if: hashFiles('./sdcore-helm-charts/Chart.yaml') != ''
         run: |
-          echo "Processing umbrella chart: ${{ env.UMBRELLA_CHARTS }}"
-          helm dependency update "${{ env.UMBRELLA_CHARTS }}"
-          helm package "${{ env.UMBRELLA_CHARTS }}" --destination ${{ env.CHARTS_DIR }}
+          echo "🔄 Processing umbrella chart: ${{ env.UMBRELLA_CHARTS }}"
+
+          # Extract chart info first
           CHART_NAME=$(helm show chart "${{ env.UMBRELLA_CHARTS }}" | grep '^name:' | awk '{print $2}')
           CHART_VERSION=$(helm show chart "${{ env.UMBRELLA_CHARTS }}" | grep '^version:' | awk '{print $2}')
-          echo "Publishing umbrella chart $CHART_NAME:$CHART_VERSION to OCI registry"
+
+          if [ -z "$CHART_NAME" ] || [ -z "$CHART_VERSION" ]; then
+            echo "❌ Could not extract umbrella chart name or version"
+            exit 1
+          fi
+
+          # Check if umbrella chart already exists
+          echo "🔍 Checking if umbrella chart $CHART_NAME:$CHART_VERSION exists..."
+          if helm pull "oci://${{ inputs.registry }}/${{ github.repository_owner }}/$CHART_NAME" --version "$CHART_VERSION" --destination /tmp >/dev/null 2>&1; then
+            echo "⏭️  Umbrella chart $CHART_NAME:$CHART_VERSION already exists, skipping"
+            rm -f /tmp/$CHART_NAME-$CHART_VERSION.tgz 2>/dev/null
+            exit 0
+          fi
+
+          echo "✨ Umbrella chart $CHART_NAME:$CHART_VERSION does not exist, will publish"
+
+          helm dependency update "${{ env.UMBRELLA_CHARTS }}"
+          helm package "${{ env.UMBRELLA_CHARTS }}" --destination ${{ env.CHARTS_DIR }}
+
+          echo "📦 Publishing umbrella chart $CHART_NAME:$CHART_VERSION to OCI registry"
           helm push "${{ env.CHARTS_DIR }}/${CHART_NAME}-${CHART_VERSION}.tgz" \
             oci://${{ inputs.registry }}/${{ github.repository_owner }}
+          echo "✅ Successfully pushed umbrella chart $CHART_NAME:$CHART_VERSION"
 
       - name: List published charts
         run: |
-          echo "Charts published to ${{ inputs.registry }}/${{ github.repository_owner }}:"
-          ls -la ${{ env.CHARTS_DIR }}/*.tgz 2>/dev/null || echo "No chart packages found"
+          echo "📋 Charts in build directory:"
+          ls -la ${{ env.CHARTS_DIR }}/*.tgz 2>/dev/null || echo "No chart packages found in build directory"

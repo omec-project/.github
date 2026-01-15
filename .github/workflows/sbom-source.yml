@@ -1,7 +1,7 @@
 # Copyright 2026 Intel Corporation
 # SPDX-FileCopyrightText: 2026 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
-name: SBOM (source)
+name: SBOM
 
 on:
   workflow_call:
@@ -11,6 +11,9 @@ on:
         required: false
         type: string
         default: ${{ github.ref }}
+      changed:
+        required: true
+        type: string
       sbom_format:
         description: "SBOM format (spdx-json, cyclonedx-json, etc.)"
         required: false
@@ -30,12 +33,7 @@ on:
 jobs:
   sbom:
     runs-on: ubuntu-latest
-    permissions:
-      # Only read access is required for source SBOM generation and
-      # uploading workflow artifacts; write access is only needed
-      # when publishing SBOMs as release assets.
-      contents: read
-
+    if: ${{ inputs.changed == 'true' }}
     steps:
       - uses: actions/checkout@v6
         with:
