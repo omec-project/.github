@@ -22,7 +22,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ inputs.github_registry }}
-          username: ${{ vars.GH_ACCOUNT }}
+          username: ${{ vars.GH_ACCOUNT }} # GH_ACCOUNT is set at the organization level
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push to GitHub Container Registry
