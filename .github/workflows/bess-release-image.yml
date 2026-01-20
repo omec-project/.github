@@ -22,11 +22,11 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ${{ inputs.github_registry }}
-          username: ${{ github.actor }}
+          username: ${{ vars.GH_ACCOUNT }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and Push to GitHub Container Registry
         env:
           DOCKER_REGISTRY: ${{ inputs.github_registry }}/
-          DOCKER_REPOSITORY: ${{ github.repository_owner }}/
+          DOCKER_REPOSITORY: ${{ github.repository }}/
         run: yes y | ./env/rebuild_images.py jammy64
