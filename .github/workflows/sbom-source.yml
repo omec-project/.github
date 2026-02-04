@@ -29,8 +29,40 @@ on:
         required: false
         type: string
         default: "."
+      # ── Grype configuration ──────────────────────────────────
+      grype_enabled:
+        description: "Enable Grype vulnerability scan on the generated SBOM"
+        required: false
+        type: boolean
+        default: true
+      grype_severity_cutoff:
+        description: "Minimum severity to report (negligible, low, medium, high, critical)"
+        required: false
+        type: string
+        default: medium
+      grype_fail_build:
+        description: "Fail the workflow if vulnerabilities at or above the severity cutoff are found"
+        required: false
+        type: boolean
+        default: true
+      grype_only_fixed:
+        description: "Only report vulnerabilities that have a known fix"
+        required: false
+        type: boolean
+        default: false
+      grype_output_format:
+        description: "Grype output format (table, json, cyclonedx-json, sarif)"
+        required: false
+        type: string
+        default: sarif
+      grype_upload_sarif:
+        description: "Upload SARIF results to GitHub Code Scanning (requires sarif output format)"
+        required: false
+        type: boolean
+        default: true
 
 jobs:
+  # ── Stage 1: Generate SBOM with Syft ──────────────────────
   sbom:
     runs-on: ubuntu-latest
     if: ${{ inputs.changed == 'true' }}
@@ -46,3 +78,54 @@ jobs:
           format: ${{ inputs.sbom_format }}
           artifact-name: ${{ inputs.artifact_name }}
           upload-release-assets: false
+
+  # ── Stage 2: Scan SBOM for vulnerabilities with Grype ─────
+  grype:
+    runs-on: ubuntu-latest
+    needs: sbom
+    if: ${{ inputs.changed == 'true' && inputs.grype_enabled }}
+    permissions:
+      security-events: write   # Required for SARIF upload to Code Scanning
+      actions: read
+      contents: read
+    steps:
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/sbom
+
+      - name: Locate SBOM file
+        id: sbom-file
+        run: |
+          SBOM_FILE=$(find "${{ runner.temp }}/sbom" -type f | head -n 1)
+          if [ -z "$SBOM_FILE" ]; then
+            echo "::error::No SBOM file found in the downloaded artifact"
+            exit 1
+          fi
+          echo "path=${SBOM_FILE}" >> "$GITHUB_OUTPUT"
+          echo "Found SBOM: ${SBOM_FILE}"
+
+      - name: Scan SBOM with Grype
+        id: grype-scan
+        uses: anchore/scan-action@v6
+        with:
+          sbom: ${{ steps.sbom-file.outputs.path }}
+          severity-cutoff: ${{ inputs.grype_severity_cutoff }}
+          fail-build: ${{ inputs.grype_fail_build }}
+          only-fixed: ${{ inputs.grype_only_fixed }}
+          output-format: ${{ inputs.grype_output_format }}
+
+      - name: Upload Grype SARIF to GitHub Code Scanning
+        if: ${{ inputs.grype_upload_sarif && inputs.grype_output_format == 'sarif' && always() }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.grype-scan.outputs.sarif }}
+
+      - name: Upload Grype results as artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: grype-vulnerability-report
+          path: ${{ steps.grype-scan.outputs.sarif || steps.grype-scan.outputs.json }}
+          retention-days: 30
