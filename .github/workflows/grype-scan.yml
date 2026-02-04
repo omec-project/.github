@@ -1,0 +1,88 @@
+# Copyright 2026 Intel Corporation
+# SPDX-FileCopyrightText: 2026 Intel Corporation
+# SPDX-License-Identifier: Apache-2.0
+name: Grype Scan
+on:
+  workflow_call:
+    inputs:
+      changed:
+        required: true
+        type: string
+      artifact_name:
+        description: "Name of the SBOM artifact to download and scan"
+        required: true
+        type: string
+      severity_cutoff:
+        description: "Minimum severity to report (negligible, low, medium, high, critical)"
+        required: false
+        type: string
+        default: medium
+      fail_build:
+        description: "Fail the workflow if vulnerabilities at or above the severity cutoff are found"
+        required: false
+        type: boolean
+        default: true
+      only_fixed:
+        description: "Only report vulnerabilities that have a known fix"
+        required: false
+        type: boolean
+        default: false
+      output_format:
+        description: "Grype output format (table, json, cyclonedx-json, sarif)"
+        required: false
+        type: string
+        default: sarif
+      upload_sarif:
+        description: "Upload SARIF results to GitHub Code Scanning (requires sarif output format)"
+        required: false
+        type: boolean
+        default: true
+jobs:
+  grype:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.changed == 'true' }}
+    permissions:
+      security-events: write   # Required for SARIF upload to Code Scanning
+      actions: read
+      contents: read
+    steps:
+      - name: Download SBOM artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/sbom
+
+      - name: Locate SBOM file
+        id: sbom-file
+        run: |
+          SBOM_FILE=$(find "${{ runner.temp }}/sbom" -type f | head -n 1)
+          if [ -z "$SBOM_FILE" ]; then
+            echo "::error::No SBOM file found in the downloaded artifact"
+            exit 1
+          fi
+          echo "path=${SBOM_FILE}" >> "$GITHUB_OUTPUT"
+          echo "Found SBOM: ${SBOM_FILE}"
+
+      - name: Scan SBOM with Grype
+        id: grype-scan
+        uses: anchore/scan-action@v6
+        with:
+          sbom: ${{ steps.sbom-file.outputs.path }}
+          severity-cutoff: ${{ inputs.severity_cutoff }}
+          fail-build: ${{ inputs.fail_build }}
+          only-fixed: ${{ inputs.only_fixed }}
+          output-format: ${{ inputs.output_format }}
+
+      - name: Upload Grype SARIF to GitHub Code Scanning
+        if: ${{ inputs.upload_sarif && inputs.output_format == 'sarif' && always() }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ${{ steps.grype-scan.outputs.sarif }}
+
+      - name: Upload Grype results as artifact
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: grype-vulnerability-report
+          path: ${{ steps.grype-scan.outputs.sarif || steps.grype-scan.outputs.json }}
+          retention-days: 30
