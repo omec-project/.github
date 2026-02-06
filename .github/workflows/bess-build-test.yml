@@ -22,23 +22,29 @@ jobs:
       - name: Setup environment (Hugepages)
         run: |
           sudo sysctl -w vm.nr_hugepages=512
-
-      - name: Setup dependencies
-        run: |
-          sudo apt-get install -y ccache libbpf-dev libgflags-dev libpcap-dev libgrpc++-dev
-          sudo pip3 install -r requirements.txt
-          yes n | ./env/rebuild_images.py jammy64
           sudo mkdir -p /mnt/huge
           sudo mount -t hugetlbfs nodev /mnt/huge
+
+      - name: Setup dependencies using Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible
+          sudo ansible-playbook env/cndp.yml -i "localhost," -c local
+          sudo ansible-playbook env/ci.yml -i "localhost," -c local
+          export VER_CXX=g++
           export CXX="ccache $VER_CXX"
           ccache -s
 
       - name: Build BESS
+        env:
+          PKG_CONFIG_PATH: /usr/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig
         run: |
-          sudo ./container_build.py bess
-          sudo ./container_build.py kmod_buildtest
+          sudo -E PKG_CONFIG_PATH=$PKG_CONFIG_PATH ./build.py bess
+          sudo ./build.py kmod
 
       - name: Test BESS
+        env:
+          BESS_DPDK_DISABLE: "1"
         run: |
           (cd core && ./all_test)
           coverage run -m unittest discover -v
