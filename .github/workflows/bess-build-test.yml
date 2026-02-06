@@ -14,6 +14,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      CXX: "ccache g++"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -31,15 +33,13 @@ jobs:
           sudo apt-get install -y ansible
           sudo ansible-playbook env/cndp.yml -i "localhost," -c local
           sudo ansible-playbook env/ci.yml -i "localhost," -c local
-          export VER_CXX=g++
-          export CXX="ccache $VER_CXX"
           ccache -s
 
       - name: Build BESS
         env:
           PKG_CONFIG_PATH: /usr/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/local/lib/pkgconfig
         run: |
-          sudo -E PKG_CONFIG_PATH=$PKG_CONFIG_PATH ./build.py bess
+          sudo --preserve-env=CXX,PKG_CONFIG_PATH ./build.py bess
           sudo ./build.py kmod
 
       - name: Test BESS
