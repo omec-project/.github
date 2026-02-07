@@ -60,7 +60,7 @@ jobs:
 
       - name: Scan SBOM with Grype
         id: grype-scan
-        uses: anchore/scan-action@v6
+        uses: anchore/scan-action@v7
         with:
           sbom: ${{ steps.sbom-file.outputs.path }}
           severity-cutoff: ${{ inputs.severity_cutoff }}
