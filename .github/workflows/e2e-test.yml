@@ -44,7 +44,10 @@ jobs:
           AETHER_ONRAMP_REF="main"
           # Clone to parent directory to avoid polluting current workspace
           AETHER_ONRAMP_DIR="${GITHUB_WORKSPACE}/../aether-onramp"
-          git clone --recursive --branch "${AETHER_ONRAMP_REF}" --depth 1 ${REPO_URL} "${AETHER_ONRAMP_DIR}"
+          if ! git clone --recursive --branch "${AETHER_ONRAMP_REF}" --depth 1 ${REPO_URL} "${AETHER_ONRAMP_DIR}"; then
+            echo "ERROR: Failed to clone aether-onramp repository from ${REPO_URL}" >&2
+            exit 1
+          fi
           cd "${AETHER_ONRAMP_DIR}"
           echo "=== aether-onramp commit used ==="
           git log -1 --format="Commit: %H%nAuthor: %an%nDate: %ad%nMessage: %s"
@@ -125,12 +128,12 @@ jobs:
           fi
 
           echo "=== Verifying image in local registry ==="
-          curl -X GET http://localhost:5000/v2/${IMAGE_NAME}/tags/list
+          curl -f -X GET http://localhost:5000/v2/${IMAGE_NAME}/tags/list
 
           # Verify deployment exists before patching
           echo "=== Checking deployment exists ==="
           if ! kubectl -n "$NAMESPACE" get deployment "$REPO_NAME" &>/dev/null; then
-            echo "ERROR: Deployment ${REPO_NAME} not found in namespace ${NAMESPACE}"
+            echo "ERROR: Deployment ${REPO_NAME} not found in namespace ${NAMESPACE}" >&2
             kubectl -n "$NAMESPACE" get deployments
             exit 1
           fi
@@ -139,8 +142,8 @@ jobs:
           echo "=== Finding container index ==="
           CONTAINER_INDEX=$(kubectl -n "$NAMESPACE" get deployment "$REPO_NAME" -o jsonpath="{.spec.template.spec.containers[*].name}" | tr ' ' '\n' | grep -n "^${IMAGE_NAME}$" | cut -d: -f1)
           if [ -z "$CONTAINER_INDEX" ]; then
-            echo "ERROR: Container '${IMAGE_NAME}' not found in deployment ${REPO_NAME}"
-            echo "Available containers:"
+            echo "ERROR: Container '${IMAGE_NAME}' not found in deployment ${REPO_NAME}" >&2
+            echo "Available containers:" >&2
             kubectl -n "$NAMESPACE" get deployment "$REPO_NAME" -o jsonpath='{.spec.template.spec.containers[*].name}'
             exit 1
           fi
@@ -210,6 +213,15 @@ jobs:
             echo "summary.log contents:"
             echo "$status"
             exit 1
+          fi
+
+      - name: Cleanup local registry
+        if: always()
+        run: |
+          if docker ps -a --format '{{.Names}}' | grep -q '^registry$'; then
+            echo "Stopping and removing local registry container..."
+            docker stop registry || true
+            docker rm registry || true
           fi
 
       - name: Dump all pod logs in aether-5gc namespace
