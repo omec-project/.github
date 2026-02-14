@@ -101,17 +101,19 @@ def update_hosts_ini(aether_dir: Path, ip_addr: str) -> None:
     else:
         # Create new file if it doesn't exist
         print(f"Creating new {hosts_file}")
-        content = f"""[all]
-node1 ansible_host={ip_addr} ansible_user={ansible_user} ansible_ssh_private_key_file={ssh_key_file}
-
-[master_nodes]
-node1
-
-[worker_nodes]
-
-[gnbsim_nodes]
-node1
-"""
+        content = (
+            "[all]\n"
+            f"node1 ansible_host={ip_addr} ansible_user={ansible_user} "
+            f"ansible_ssh_private_key_file={ssh_key_file}\n"
+            "\n"
+            "[master_nodes]\n"
+            "node1\n"
+            "\n"
+            "[worker_nodes]\n"
+            "\n"
+            "[gnbsim_nodes]\n"
+            "node1\n"
+        )
 
     hosts_file.write_text(content)
 

@@ -79,7 +79,7 @@ jobs:
       - name: Update aether-onramp configuration files
         run: |
           # Update all configuration: hosts.ini, timeouts, and sd-core values with local image
-          .github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" "${IMAGE_NAME}" "${LOCAL_IMAGE_NAME}"
+          python3 .github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" "${IMAGE_NAME}" "${LOCAL_IMAGE_NAME}"
 
       - name: Check values file
         run: |
