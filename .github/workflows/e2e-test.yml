@@ -76,6 +76,9 @@ jobs:
           # Export for use in subsequent steps
           echo "AETHER_ONRAMP_DIR=${AETHER_ONRAMP_DIR}" >> "$GITHUB_ENV"
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.3.1
+
       - name: Update aether-onramp configuration files
         run: |
           # Update all configuration: hosts.ini, timeouts, and sd-core values with local image

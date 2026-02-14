@@ -123,11 +123,21 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str) -> None:
     vars_file = aether_dir / 'vars' / 'main.yml'
     content = vars_file.read_text()
 
-    # Replace interface and IP
-    content = content.replace('ens18', interface)
-    content = content.replace('10.76.28.113', ip_addr)
+    # Replace interface and IP, asserting that the expected placeholders exist
+    updated_content = content.replace('ens18', interface)
+    if updated_content == content:
+        raise RuntimeError(
+            f"Expected interface placeholder 'ens18' not found in {vars_file}"
+        )
 
-    vars_file.write_text(content)
+    content = updated_content
+    updated_content = content.replace('10.76.28.113', ip_addr)
+    if updated_content == content:
+        raise RuntimeError(
+            f"Expected IP address placeholder '10.76.28.113' not found in {vars_file}"
+        )
+
+    vars_file.write_text(updated_content)
     print(f"Updated {vars_file}")
 
 
@@ -137,19 +147,31 @@ def update_timeouts_and_fixes(aether_dir: Path) -> None:
     # Update RKE2 install timeouts
     rke2_install = aether_dir / 'deps' / 'k8s' / 'roles' / 'rke2' / 'tasks' / 'install.yml'
     content = rke2_install.read_text()
-    content = content.replace('300s', '600s')
+    # Only update explicit timeout fields from 300s to 600s
+    updated_content, timeout_replacements = re.subn(r'(\btimeout:\s*)300s\b', r'\1600s', content)
+    if timeout_replacements == 0:
+        print(f"WARNING: No RKE2 timeout value 'timeout: 300s' found in {rke2_install}", file=sys.stderr)
+    content = updated_content
     # Remove the deployment wait line that fails in fresh cluster
-    content = '\n'.join(line for line in content.splitlines()
-                       if not ('kubectl' in line and 'wait deployment' in line and 'kube-system' in line))
+    content = '\n'.join(
+        line
+        for line in content.splitlines()
+        if not ('kubectl' in line and 'wait deployment' in line and 'kube-system' in line)
+    )
     rke2_install.write_text(content)
     print(f"Updated RKE2 timeouts in {rke2_install}")
 
     # Update 5gc deployment timeouts
     core_install = aether_dir / 'deps' / '5gc' / 'roles' / 'core' / 'tasks' / 'install.yml'
-    content = core_install.read_text()
-    content = content.replace('--timeout 10m', '--timeout 25m')
-    content = content.replace('2m30s', '10m')
-    core_install.write_text(content)
+    core_content = core_install.read_text()
+    # Only update the specific timeout flags/values we expect
+    core_content, timeout_flag_replacements = re.subn(r'--timeout\s+10m\b', '--timeout 25m', core_content)
+    core_content, duration_replacements = re.subn(r'\b2m30s\b', '10m', core_content)
+    if timeout_flag_replacements == 0:
+        print(f"WARNING: No 5gc '--timeout 10m' option found in {core_install}", file=sys.stderr)
+    if duration_replacements == 0:
+        print(f"WARNING: No 5gc '2m30s' duration found in {core_install}", file=sys.stderr)
+    core_install.write_text(core_content)
     print(f"Updated 5gc timeouts in {core_install}")
 
 
@@ -169,7 +191,6 @@ def replace_aether_templates_with_placeholders(content: str) -> Tuple[str, Dict[
         return f'"{placeholder}"'
 
     modified_content = template_pattern.sub(replace_template, content)
-    print(f"Replaced {len(templates)} Aether templates with placeholders", file=sys.stderr)
     return modified_content, templates
 
 
@@ -189,15 +210,12 @@ def restore_aether_templates(content: str, templates: Dict[str, str]) -> str:
         if quoted_placeholder in content:
             content = content.replace(quoted_placeholder, template)
             replacements_made += 1
-            print(f"DEBUG: Replaced quoted placeholder {placeholder[:30]}...", file=sys.stderr)
         elif placeholder in content:
             content = content.replace(placeholder, template)
             replacements_made += 1
-            print(f"DEBUG: Replaced unquoted placeholder {placeholder[:30]}...", file=sys.stderr)
         else:
             print(f"WARNING: Placeholder not found: {placeholder[:30]}...", file=sys.stderr)
 
-    print(f"DEBUG: Made {replacements_made} replacements total", file=sys.stderr)
     return content
 
 
@@ -293,8 +311,6 @@ def build_image_overrides(
         print("WARNING: No enabled sections found in values file")
         return overrides
 
-    print(f"DEBUG: Processing enabled sections: {', '.join(enabled_sections)}")
-
     for section_name in enabled_sections:
         # Try to find corresponding chart directory
         section_dir = find_single_directory(chart_dir, section_name)
@@ -304,26 +320,20 @@ def build_image_overrides(
             section_dir = find_single_directory(chart_dir, 'bess-upf')
 
         if not section_dir or not (section_dir / 'values.yaml').exists():
-            print(f"DEBUG: Skipping {section_name} - no chart directory found")
             continue
-
-        print(f"DEBUG: Processing images for {section_name}...")
 
         with open(section_dir / 'values.yaml', 'r') as f:
             chart_values = yaml.safe_load(f)
 
         # Check if this chart has images to override
         if not chart_values.get('images', {}).get('tags'):
-            print(f"DEBUG: No image tags found in {section_name}")
             continue
 
         tags = {}
         for tag_name, tag_value in chart_values.get('images', {}).get('tags', {}).items():
             if tag_name == image_name:
-                print(f"DEBUG: >>> MATCH! Using local image for {tag_name}: {local_image_name}")
                 tags[tag_name] = local_image_name
             else:
-                print(f"DEBUG: Using registry mirror for {tag_name}: {registry_prefix}{tag_value}")
                 tags[tag_name] = f"{registry_prefix}{tag_value}"
 
         # Build override structure
@@ -354,11 +364,8 @@ def configure_sdcore_images(
         print(f"ERROR: Values file does not exist: {base_values_file}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"DEBUG: Processing file: {base_values_file}")
-
     # Read original content
     original_content = base_values_file.read_text()
-    print(f"DEBUG: Original file size: {len(original_content)} bytes")
 
     # Replace Aether templates with placeholders
     print("Replacing Aether templates with placeholders...")
@@ -409,19 +416,14 @@ def configure_sdcore_images(
                 yaml.dump(overrides, temp_override, default_flow_style=False, sort_keys=False)
                 temp_override_path = Path(temp_override.name)
 
-            print("\nDEBUG: Override content:")
-            print(temp_override_path.read_text())
-
             try:
                 # Merge the YAML files
-                print("\nDEBUG: Merging overrides...")
                 merged_data = merge_yaml_files(temp_base_path, temp_override_path)
 
                 # Write merged data back to string
                 merged_yaml = yaml.dump(merged_data, default_flow_style=False, sort_keys=False)
 
                 # Restore Aether templates
-                print("\nDEBUG: Restoring Aether templates...")
                 final_content = restore_aether_templates(merged_yaml, template_map)
 
                 # Write final content back to original file

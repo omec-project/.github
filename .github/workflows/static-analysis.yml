@@ -26,5 +26,5 @@ jobs:
 
       - uses: dominikh/staticcheck-action@v1.4.0
         with:
-          version: latest
+          version: "2025.1"
           install-go: false
