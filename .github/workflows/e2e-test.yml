@@ -21,20 +21,42 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Set image names
+        run: |
+          REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | cut -d'/' -f2)
+          # webconsole uses 'webui' as the image name
+          IMAGE_NAME="${REPO_NAME/webconsole/webui}"
+          LOCAL_IMAGE_NAME="localhost:5000/${IMAGE_NAME}:testing"
+          echo "REPO_NAME=${REPO_NAME}" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=${IMAGE_NAME}" >> "$GITHUB_ENV"
+          echo "LOCAL_IMAGE_NAME=${LOCAL_IMAGE_NAME}" >> "$GITHUB_ENV"
+          echo "Repository: ${REPO_NAME}"
+          echo "Image name: ${IMAGE_NAME}"
+          echo "Local image name: ${LOCAL_IMAGE_NAME}"
+
       - name: Update and install dependencies
         run: |
           set -e
           sudo apt update
-          sudo apt-get install -y conntrack socat ipset ebtables ansible-core
-          sudo apt install -y sshpass python3-venv pipx make git
+          # Kubernetes dependencies
+          sudo apt-get install -y conntrack socat ipset ebtables
+          # Build and automation tools
+          sudo apt install -y pipx make python3-yaml
+          # Install Ansible via pipx for aether-onramp
           pipx install --include-deps ansible
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Generate SSH Key
         run: |
           set -e
+          # NOTE: This job runs on a GitHub-hosted runner. The VM and its filesystem
+          # are ephemeral and destroyed after the job completes, so this SSH key does
+          # not persist beyond the lifetime of this workflow run.
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
           ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N "" -q
           cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
 
       - name: Clone aether-onramp repository
         run: |
@@ -54,31 +76,14 @@ jobs:
           # Export for use in subsequent steps
           echo "AETHER_ONRAMP_DIR=${AETHER_ONRAMP_DIR}" >> "$GITHUB_ENV"
 
-      - name: Update files
+      - name: Update aether-onramp configuration files
         run: |
-          set -e
-          INTERFACE=$(ip route | awk '/default/ {print $5}')
-          IP_ADDR=$(ip -4 addr show ${INTERFACE} | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
-          if [ -z "${IP_ADDR}" ]; then
-            echo "Failed to extract IP address" >&2
-            exit 1
-          fi
-          echo "Extracted IP: ${IP_ADDR}"
-          echo "[all]" > "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "node1 ansible_host=${IP_ADDR} ansible_user=runner ansible_ssh_private_key_file=~/.ssh/id_rsa" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "[master_nodes]" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "node1" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "[worker_nodes]" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "[gnbsim_nodes]" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          echo "node1" >> "${AETHER_ONRAMP_DIR}/hosts.ini"
-          sed -i "s/ens18/eth0/" "${AETHER_ONRAMP_DIR}/vars/main.yml"
-          sed -i "s/10.76.28.113/${IP_ADDR}/" "${AETHER_ONRAMP_DIR}/vars/main.yml"
-          sed -i "s/300s/600s/" "${AETHER_ONRAMP_DIR}/deps/k8s/roles/rke2/tasks/install.yml"
-          sed -i '99d' "${AETHER_ONRAMP_DIR}/deps/k8s/roles/rke2/tasks/install.yml"
-          sed -i "s/2m30s/10m/" "${AETHER_ONRAMP_DIR}/deps/5gc/roles/core/tasks/install.yml"
+          # Update all configuration: hosts.ini, timeouts, and sd-core values with local image
+          .github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" "${IMAGE_NAME}" "${LOCAL_IMAGE_NAME}"
+
+      - name: Check values file
+        run: |
+          cat "${AETHER_ONRAMP_DIR}/deps/5gc/roles/core/templates/sdcore-5g-values.yaml"
 
       - name: Test aether-pingall
         run: |
@@ -92,26 +97,16 @@ jobs:
           cd "${AETHER_ONRAMP_DIR}"
           make aether-k8s-install
 
-      - name: Install 5G Core
-        run: |
-          set -e
-          cd "${AETHER_ONRAMP_DIR}"
-          make aether-5gc-install
-
-      - name: Patch K8s Deployment to attach local image
+      - name: Build and push local image to registry
         run: |
           set -ex
-          REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | cut -d'/' -f2)
 
           # Use the repository already checked out in the workspace
           cd "${GITHUB_WORKSPACE}"
 
-          # webconsole uses 'webui' as the image name
-          IMAGE_NAME="${REPO_NAME/webconsole/webui}"
-
-          # Set up a local registry to serve the image
+          # Set up a local registry to serve the image; use host networking to avoid exposing an extra mapped port
           echo "=== Starting local registry ==="
-          docker run -d -p 5000:5000 --name registry registry:2
+          docker run -d --network host --name registry registry:2
 
           # Build and push to local registry
           LOCAL_IMAGE_NAME="localhost:5000/${IMAGE_NAME}:testing"
@@ -130,53 +125,17 @@ jobs:
           echo "=== Verifying image in local registry ==="
           curl -f -X GET http://localhost:5000/v2/${IMAGE_NAME}/tags/list
 
-          # Verify deployment exists before patching
-          echo "=== Checking deployment exists ==="
-          if ! kubectl -n "$NAMESPACE" get deployment "$REPO_NAME" &>/dev/null; then
-            echo "ERROR: Deployment ${REPO_NAME} not found in namespace ${NAMESPACE}" >&2
-            kubectl -n "$NAMESPACE" get deployments
-            exit 1
-          fi
-
-          # Find the container index by name
-          echo "=== Finding container index ==="
-          CONTAINER_INDEX=$(kubectl -n "$NAMESPACE" get deployment "$REPO_NAME" -o jsonpath="{.spec.template.spec.containers[*].name}" | tr ' ' '\n' | grep -n "^${IMAGE_NAME}$" | cut -d: -f1)
-          if [ -z "$CONTAINER_INDEX" ]; then
-            echo "ERROR: Container '${IMAGE_NAME}' not found in deployment ${REPO_NAME}" >&2
-            echo "Available containers:" >&2
-            kubectl -n "$NAMESPACE" get deployment "$REPO_NAME" -o jsonpath='{.spec.template.spec.containers[*].name}'
-            exit 1
-          fi
-          # Convert to 0-based index
-          CONTAINER_INDEX=$((CONTAINER_INDEX - 1))
-          echo "Found container '${IMAGE_NAME}' at index ${CONTAINER_INDEX}"
-
-          # Patch K8s deployment to use local registry
-          echo "=== Patching deployment ==="
-          kubectl -n "$NAMESPACE" patch deployment "$REPO_NAME" --type="json" -p="[
-            {\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/${CONTAINER_INDEX}/image\", \"value\": \"${LOCAL_IMAGE_NAME}\"},
-            {\"op\": \"replace\", \"path\": \"/spec/template/spec/containers/${CONTAINER_INDEX}/imagePullPolicy\", \"value\": \"Always\"}
-          ]"
-
-          echo "=== Verifying deployment patch ==="
-          kubectl -n "$NAMESPACE" get deployment "$REPO_NAME" -o jsonpath="{.spec.template.spec.containers[${CONTAINER_INDEX}].image}{\"\n\"}"
-          kubectl -n "$NAMESPACE" get deployment "$REPO_NAME" -o jsonpath="{.spec.template.spec.containers[${CONTAINER_INDEX}].imagePullPolicy}{\"\n\"}"
-
-          echo "=== Waiting for pod to be ready ==="
-          # Allow overriding the rollout timeout via K8S_ROLLOUT_TIMEOUT (e.g. '300s', '600s'); default is 300s
-          ROLLOUT_TIMEOUT="${K8S_ROLLOUT_TIMEOUT:-300s}"
-          kubectl -n "$NAMESPACE" rollout status deployment "$REPO_NAME" --timeout="${ROLLOUT_TIMEOUT}" || {
-            echo "=== Rollout failed after timeout ${ROLLOUT_TIMEOUT}, checking pod status ==="
-            kubectl -n "$NAMESPACE" get pods -l app="${IMAGE_NAME}"
-            kubectl -n "$NAMESPACE" describe pods -l app="${IMAGE_NAME}"
-            exit 1
-          }
-
-      - name: Wait for network function to sync up with others
+      - name: Install 5G Core
         run: |
           set -e
-          echo "Waiting for all pods in aether-5gc namespace to be Ready..."
-          kubectl wait --for=condition=ready pod --all -n aether-5gc --timeout=300s
+          cd "${AETHER_ONRAMP_DIR}"
+          make aether-5gc-install
+
+      - name: Pods status
+        run: |
+          set -e
+          echo "Pods status"
+          kubectl get pods -n "$NAMESPACE"
 
       - name: Install GNBSIM
         run: |
@@ -228,9 +187,6 @@ jobs:
         if: always()
         run: |
           set -ex
-          REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | cut -d'/' -f2)
-          # webconsole uses 'webui' as the app label
-          APP_LABEL="${REPO_NAME/webconsole/webui}"
 
           mkdir -p logs
           kubectl get events -A --sort-by='.lastTimestamp' > logs/events.log
@@ -243,7 +199,7 @@ jobs:
               fi
             fi
           done
-          for pod in $(kubectl get pods -n "$NAMESPACE" -l app="${APP_LABEL}" -o jsonpath='{.items[*].metadata.name}'); do
+          for pod in $(kubectl get pods -n "$NAMESPACE" -l app="${IMAGE_NAME}" -o jsonpath='{.items[*].metadata.name}'); do
             kubectl describe pod -n "$NAMESPACE" "$pod" > "logs/${pod}-describe.log" 2>&1 || true
           done
           docker exec gnbsim-1 cat gnbsim.log > logs/gnbsim.log 2>&1 || true
