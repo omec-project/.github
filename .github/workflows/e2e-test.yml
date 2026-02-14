@@ -21,8 +21,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Checkout omec-project/.github repository for scripts
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.repository_owner }}/.github
+          path: .github-repo
+
       - name: Set image names
         run: |
+          set -euo pipefail
           REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | cut -d'/' -f2)
           # webconsole uses 'webui' as the image name
           IMAGE_NAME="${REPO_NAME/webconsole/webui}"
@@ -45,6 +52,8 @@ jobs:
           # Install Ansible via pipx for aether-onramp
           pipx install --include-deps ansible
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          # Print Ansible version for reproducibility tracking
+          "$HOME/.local/bin/ansible" --version
 
       - name: Generate SSH Key
         run: |
@@ -82,7 +91,7 @@ jobs:
       - name: Update aether-onramp configuration files
         run: |
           # Update all configuration: hosts.ini, timeouts, and sd-core values with local image
-          python3 .github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" "${IMAGE_NAME}" "${LOCAL_IMAGE_NAME}"
+          python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" "${IMAGE_NAME}" "${LOCAL_IMAGE_NAME}"
 
       - name: Check values file
         run: |
@@ -129,6 +138,7 @@ jobs:
           curl -f -X GET http://localhost:5000/v2/${IMAGE_NAME}/tags/list
 
       - name: Install 5G Core
+        id: install-5gc
         run: |
           set -e
           cd "${AETHER_ONRAMP_DIR}"
@@ -187,7 +197,7 @@ jobs:
           fi
 
       - name: Dump all pod logs in aether-5gc namespace
-        if: always()
+        if: always() && (steps.install-5gc.outcome == 'success' || steps.install-5gc.outcome == 'failure')
         run: |
           set -ex
 
@@ -208,7 +218,7 @@ jobs:
           docker exec gnbsim-1 cat gnbsim.log > logs/gnbsim.log 2>&1 || true
 
       - name: Upload pod logs
-        if: always()
+        if: always() && (steps.install-5gc.outcome == 'success' || steps.install-5gc.outcome == 'failure')
         uses: actions/upload-artifact@v6.0.0
         with:
           name: aether-5gc-logs
