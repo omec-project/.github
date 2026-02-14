@@ -216,6 +216,14 @@ def restore_aether_templates(content: str, templates: Dict[str, str]) -> str:
         else:
             print(f"WARNING: Placeholder not found: {placeholder[:30]}...", file=sys.stderr)
 
+    # Report restoration results
+    expected_count = len(templates)
+    print(f"Restored {replacements_made}/{expected_count} Aether templates")
+
+    if replacements_made == 0 and expected_count > 0:
+        print("ERROR: No templates were restored, but templates were expected", file=sys.stderr)
+        sys.exit(1)
+
     return content
 
 
@@ -289,7 +297,7 @@ def get_enabled_sections(base_values_file: Path) -> list:
                     section_config.get('enable5G') is True or
                     section_config.get('enable4G') is True):
                     enabled_sections.append(section_name)
-                    print(f"DEBUG: Found enabled section: {section_name}")
+                    print(f"Found enabled section: {section_name}")
 
     return enabled_sections
 
