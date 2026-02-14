@@ -376,15 +376,18 @@ def configure_sdcore_images(
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_chart_dir = Path(temp_dir)
 
-            # Pull the Helm chart
+            # Pull the Helm chart into temp directory
             print(f"Pulling Helm chart...")
-            run_command(['helm', 'pull', chart_ref, '--version', chart_version, '--untar'],
+            run_command(['helm', 'pull', chart_ref, '--version', chart_version, '--untar', '--destination', str(temp_chart_dir)],
                        check=True, capture=False)
 
-            # Find the pulled chart directory (should be in current directory)
-            chart_dirs = [d for d in Path('.').iterdir() if d.is_dir() and d.name.startswith('sd-core')]
+            # Find the pulled chart directory (should be in temp directory)
+            chart_dirs = [d for d in temp_chart_dir.iterdir() if d.is_dir() and d.name.startswith('sd-core')]
             if not chart_dirs:
                 print("ERROR: Could not find pulled chart directory", file=sys.stderr)
+                sys.exit(1)
+            if len(chart_dirs) > 1:
+                print(f"ERROR: Found multiple sd-core directories in temp directory: {[d.name for d in chart_dirs]}", file=sys.stderr)
                 sys.exit(1)
 
             pulled_chart_dir = chart_dirs[0]
