@@ -53,7 +53,7 @@ jobs:
           pipx install --include-deps ansible
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           # Print Ansible version for reproducibility tracking
-          "$HOME/.local/bin/ansible" --version
+          ansible --version
 
       - name: Generate SSH Key
         run: |
