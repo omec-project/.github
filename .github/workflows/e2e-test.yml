@@ -49,11 +49,16 @@ jobs:
           sudo apt-get install -y conntrack socat ipset ebtables
           # Build and automation tools
           sudo apt install -y pipx make python3-yaml
+          # Remove any existing ansible-core to avoid conflicts
+          pipx uninstall ansible-core || true
           # Install Ansible via pipx for aether-onramp
           pipx install --include-deps ansible
+          pipx ensurepath
+          # Ensure all ansible commands are in PATH
+          export PATH="$HOME/.local/bin:$PATH"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           # Print Ansible version for reproducibility tracking
-          "$HOME/.local/bin/ansible" --version
+          ansible --version
 
       - name: Generate SSH Key
         run: |
