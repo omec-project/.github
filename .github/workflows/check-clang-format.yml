@@ -54,6 +54,8 @@ jobs:
           sudo ln -sf /usr/bin/clang-format-${{ inputs.clang_format_version }} /usr/bin/clang-format
 
       - name: Run clang-format check
+        id: format-check
+        continue-on-error: true
         run: |
           CHECK_PATH="${{ inputs.check_path }}"
           EXCLUDE_REGEX="${{ inputs.exclude_regex }}"
@@ -66,15 +68,56 @@ jobs:
           # Find all C/C++/Protobuf files
           INCLUDE_REGEX='^.*\.((((c|C)(c|pp|xx|\+\+)?$)|((h|H)h?(pp|xx|\+\+)?$))|(ino|pde|proto|cu))$'
 
+          # File to collect failed files
+          FAILED_FILES_LIST="${{ runner.temp }}/failed_files.txt"
+          > "$FAILED_FILES_LIST"
+          
           # Find files and check formatting
-          EXIT_CODE=0
+          HAS_FAILURES=0
           while IFS= read -r file; do
-            if ! echo "$file" | grep -Eq "$EXCLUDE_REGEX"; then
-              if ! clang-format --dry-run --Werror --style=file --fallback-style=llvm "$file"; then
+            if ! [[ "$file" =~ $EXCLUDE_REGEX ]]; then
+              if ! clang-format --dry-run --Werror --style=file --fallback-style=llvm "$file" 2>&1; then
                 echo "Failed on file: $file"
-                EXIT_CODE=1
+                echo "$file" >> "$FAILED_FILES_LIST"
+                HAS_FAILURES=1
               fi
             fi
           done < <(find "$CHECK_PATH" -name .git -prune -o -regextype posix-egrep -regex "$INCLUDE_REGEX" -print)
 
-          exit $EXIT_CODE
+          # Save results for summary step
+          echo "has_failures=$HAS_FAILURES" >> $GITHUB_OUTPUT
+          echo "failed_files_list=$FAILED_FILES_LIST" >> $GITHUB_OUTPUT
+          echo "check_path=$CHECK_PATH" >> $GITHUB_OUTPUT
+          echo "include_regex=$INCLUDE_REGEX" >> $GITHUB_OUTPUT
+          
+          exit $HAS_FAILURES
+
+      - name: Print formatting summary
+        if: always() && steps.format-check.outputs.has_failures == '1'
+        run: |
+          FAILED_FILES_LIST="${{ steps.format-check.outputs.failed_files_list }}"
+          CHECK_PATH="${{ steps.format-check.outputs.check_path }}"
+          INCLUDE_REGEX="${{ steps.format-check.outputs.include_regex }}"
+          
+          FAILED_COUNT=$(wc -l < "$FAILED_FILES_LIST")
+          
+          echo ""
+          echo "=========================================="
+          echo "Clang-format check failed for $FAILED_COUNT file(s):"
+          echo "=========================================="
+          while IFS= read -r file; do
+            echo "  - $file"
+          done < "$FAILED_FILES_LIST"
+          echo "=========================================="
+          echo ""
+          echo "To fix formatting issues, run:"
+          echo "  clang-format -i <file>"
+          echo "Or to format all files:"
+          echo "  find ${CHECK_PATH} -regextype posix-egrep -regex '${INCLUDE_REGEX}' -exec clang-format -i {} +"
+          
+          exit 1
+
+      - name: Confirm formatting success
+        if: steps.format-check.outputs.has_failures != '1'
+        run: |
+          echo "✓ All files passed clang-format check!"
