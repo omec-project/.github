@@ -40,7 +40,17 @@ jobs:
       - name: Install clang-format
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-format-${{ inputs.clang_format_version }}
+          if ! sudo apt-get install -y clang-format-${{ inputs.clang_format_version }}; then
+            echo "Error: Failed to install clang-format-${{ inputs.clang_format_version }}."
+            echo "The requested clang-format version may not be available on ubuntu-latest."
+            echo "Please select a clang_format_version that is supported by the runner image."
+            exit 1
+          fi
+          if [ ! -x "/usr/bin/clang-format-${{ inputs.clang_format_version }}" ]; then
+            echo "Error: clang-format-${{ inputs.clang_format_version }} package installed, but"
+            echo "the binary /usr/bin/clang-format-${{ inputs.clang_format_version }} is not present or not executable."
+            exit 1
+          fi
           sudo ln -sf /usr/bin/clang-format-${{ inputs.clang_format_version }} /usr/bin/clang-format
 
       - name: Run clang-format check
