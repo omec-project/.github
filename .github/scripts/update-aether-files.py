@@ -366,7 +366,7 @@ def configure_sdcore_images(
     print(f"\n=== Configuring {image_name} to use local image ===")
 
     base_values_file = aether_dir / 'deps' / '5gc' / 'roles' / 'core' / 'templates' / 'sdcore-5g-values.yaml'
-    registry_prefix = 'registry.aetherproject.org/proxy/'
+    registry_prefix = 'ghcr.io/omec-project/'
 
     if not base_values_file.exists():
         print(f"ERROR: Values file does not exist: {base_values_file}", file=sys.stderr)
