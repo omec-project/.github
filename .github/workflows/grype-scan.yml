@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload Grype results as artifact
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: grype-vulnerability-report
           path: ${{ steps.grype-scan.outputs.sarif || steps.grype-scan.outputs.json }}
