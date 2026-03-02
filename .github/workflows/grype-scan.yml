@@ -42,7 +42,7 @@ jobs:
     if: ${{ inputs.changed == 'true' }}
     steps:
       - name: Download SBOM artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ runner.temp }}/sbom
