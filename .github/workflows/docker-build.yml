@@ -24,12 +24,24 @@ jobs:
         with:
           ref: ${{ inputs.branch_name }}
 
-      - uses: actions/setup-go@v6
+      - name: Check for Go project
+        id: check-go
+        run: |
+          if [ -f "go.mod" ]; then
+            echo "go-project=true" >> $GITHUB_OUTPUT
+            echo "Go project detected"
+          else
+            echo "go-project=false" >> $GITHUB_OUTPUT
+            echo "No Go project detected"
+          fi
+
+      - name: Setup Go
+        if: steps.check-go.outputs.go-project == 'true'
+        uses: actions/setup-go@v6
         with:
           go-version-file: 'go.mod'
           cache: true
 
       - name: Build Docker image
-        run: |
-          cd ${{ inputs.build_directory }}
-          make docker-build
+        run: make docker-build
+        working-directory: ${{ inputs.build_directory }}
