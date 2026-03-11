@@ -20,11 +20,11 @@ on:
         required: false
         type: string
         default: 'make docker-build'
-      pre_build_command:
-        description: "Optional pre-build command; when set, it must be 'make pb'"
+      run_pre_build:
+        description: "Run 'make pb' before building the Docker image"
         required: false
-        type: string
-        default: ''
+        type: boolean
+        default: false
       docker_targets:
         description: "Whitespace-separated Docker build targets"
         required: false
@@ -58,17 +58,9 @@ jobs:
           go-version-file: ${{ format('{0}/go.mod', inputs.build_directory) }}
           cache: true
 
-      - name: Run pre-build command
-        if: inputs.pre_build_command != ''
-        env:
-          PRE_BUILD_COMMAND: ${{ inputs.pre_build_command }}
-        run: |
-          if [[ "${PRE_BUILD_COMMAND}" != "make pb" ]]; then
-            echo "Error: pre_build_command must be empty or 'make pb'."
-            exit 1
-          fi
-
-          make pb
+      - name: Run pre-build step
+        if: inputs.run_pre_build
+        run: make pb
         working-directory: ${{ inputs.build_directory }}
 
       - name: Build Docker image
