@@ -63,7 +63,12 @@ jobs:
         env:
           PRE_BUILD_COMMAND: ${{ inputs.pre_build_command }}
         run: |
-          if ! echo "${PRE_BUILD_COMMAND}" | grep -Eq '^make( [A-Za-z0-9_.-]+)+$'; then
+          if [[ "${PRE_BUILD_COMMAND}" == *$'\n'* || "${PRE_BUILD_COMMAND}" == *$'\r'* ]]; then
+            echo "Error: pre_build_command must be a single-line trusted make invocation."
+            exit 1
+          fi
+
+          if [[ ! "${PRE_BUILD_COMMAND}" =~ ^make( [A-Za-z0-9_.-]+)+$ ]]; then
             echo "Error: pre_build_command must be a trusted make invocation with safe target names."
             exit 1
           fi
@@ -76,14 +81,19 @@ jobs:
           BUILD_COMMAND: ${{ inputs.build_command }}
           DOCKER_TARGETS: ${{ inputs.docker_targets }}
         run: |
-          if ! echo "${BUILD_COMMAND}" | grep -Eq '^make( [A-Za-z0-9_.-]+)+$'; then
+          if [[ "${BUILD_COMMAND}" == *$'\n'* || "${BUILD_COMMAND}" == *$'\r'* ]]; then
+            echo "Error: build_command must be a single-line trusted make invocation."
+            exit 1
+          fi
+
+          if [[ ! "${BUILD_COMMAND}" =~ ^make( [A-Za-z0-9_.-]+)+$ ]]; then
             echo "Error: build_command must be a trusted make invocation with safe target names."
             exit 1
           fi
 
           if [ -n "${DOCKER_TARGETS}" ]; then
             set -f
-            IFS=' ' read -r -a targets <<< "${DOCKER_TARGETS}"
+            IFS=$' \t\n' read -r -a targets <<< "${DOCKER_TARGETS}"
             for target in "${targets[@]}"; do
               if ! echo "${target}" | grep -Eq '^[A-Za-z0-9_.-]+$'; then
                 echo "Error: docker_targets entries must contain only letters, numbers, underscores, dots, and dashes."
