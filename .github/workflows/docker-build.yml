@@ -16,12 +16,12 @@ on:
         type: string
         default: '.'
       build_command:
-        description: "Command used to build the Docker image"
+        description: "Trusted make command used to build the Docker image"
         required: false
         type: string
         default: 'make docker-build'
       pre_build_command:
-        description: "Optional command to run before building the Docker image"
+        description: "Optional trusted make command to run before building the Docker image"
         required: false
         type: string
         default: ''
@@ -60,7 +60,15 @@ jobs:
 
       - name: Run pre-build command
         if: inputs.pre_build_command != ''
-        run: ${{ inputs.pre_build_command }}
+        env:
+          PRE_BUILD_COMMAND: ${{ inputs.pre_build_command }}
+        run: |
+          if ! echo "${PRE_BUILD_COMMAND}" | grep -Eq '^make( [A-Za-z0-9_.-]+)+$'; then
+            echo "Error: pre_build_command must be a trusted make invocation with safe target names."
+            exit 1
+          fi
+
+          bash -lc "${PRE_BUILD_COMMAND}"
         working-directory: ${{ inputs.build_directory }}
 
       - name: Build Docker image
@@ -68,8 +76,20 @@ jobs:
           BUILD_COMMAND: ${{ inputs.build_command }}
           DOCKER_TARGETS: ${{ inputs.docker_targets }}
         run: |
+          if ! echo "${BUILD_COMMAND}" | grep -Eq '^make( [A-Za-z0-9_.-]+)+$'; then
+            echo "Error: build_command must be a trusted make invocation with safe target names."
+            exit 1
+          fi
+
           if [ -n "${DOCKER_TARGETS}" ]; then
-            for target in ${DOCKER_TARGETS}; do
+            set -f
+            IFS=' ' read -r -a targets <<< "${DOCKER_TARGETS}"
+            for target in "${targets[@]}"; do
+              if ! echo "${target}" | grep -Eq '^[A-Za-z0-9_.-]+$'; then
+                echo "Error: docker_targets entries must contain only letters, numbers, underscores, dots, and dashes."
+                exit 1
+              fi
+
               DOCKER_TARGETS="${target}" ${BUILD_COMMAND}
             done
           else
