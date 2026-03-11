@@ -16,12 +16,12 @@ on:
         type: string
         default: '.'
       build_command:
-        description: "Trusted make command used to build the Docker image"
+        description: "Build command; must be either 'make docker-build' or 'make build'"
         required: false
         type: string
         default: 'make docker-build'
       pre_build_command:
-        description: "Optional trusted make command to run before building the Docker image"
+        description: "Optional pre-build command; when set, it must be 'make pb'"
         required: false
         type: string
         default: ''
@@ -63,17 +63,12 @@ jobs:
         env:
           PRE_BUILD_COMMAND: ${{ inputs.pre_build_command }}
         run: |
-          if [[ "${PRE_BUILD_COMMAND}" == *$'\n'* || "${PRE_BUILD_COMMAND}" == *$'\r'* ]]; then
-            echo "Error: pre_build_command must be a single-line trusted make invocation."
+          if [[ "${PRE_BUILD_COMMAND}" != "make pb" ]]; then
+            echo "Error: pre_build_command must be empty or 'make pb'."
             exit 1
           fi
 
-          if [[ ! "${PRE_BUILD_COMMAND}" =~ ^make( [A-Za-z0-9_.-]+)+$ ]]; then
-            echo "Error: pre_build_command must be a trusted make invocation with safe target names."
-            exit 1
-          fi
-
-          bash -lc "${PRE_BUILD_COMMAND}"
+          make pb
         working-directory: ${{ inputs.build_directory }}
 
       - name: Build Docker image
@@ -81,13 +76,8 @@ jobs:
           BUILD_COMMAND: ${{ inputs.build_command }}
           DOCKER_TARGETS: ${{ inputs.docker_targets }}
         run: |
-          if [[ "${BUILD_COMMAND}" == *$'\n'* || "${BUILD_COMMAND}" == *$'\r'* ]]; then
-            echo "Error: build_command must be a single-line trusted make invocation."
-            exit 1
-          fi
-
-          if [[ ! "${BUILD_COMMAND}" =~ ^make( [A-Za-z0-9_.-]+)+$ ]]; then
-            echo "Error: build_command must be a trusted make invocation with safe target names."
+          if [[ "${BUILD_COMMAND}" != "make docker-build" && "${BUILD_COMMAND}" != "make build" ]]; then
+            echo "Error: build_command must be either 'make docker-build' or 'make build'."
             exit 1
           fi
 
