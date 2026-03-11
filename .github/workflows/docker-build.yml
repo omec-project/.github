@@ -15,6 +15,21 @@ on:
         required: false
         type: string
         default: '.'
+      build_command:
+        description: "Command used to build the Docker image"
+        required: false
+        type: string
+        default: 'make docker-build'
+      pre_build_command:
+        description: "Optional command to run before building the Docker image"
+        required: false
+        type: string
+        default: ''
+      docker_targets:
+        description: "Whitespace-separated Docker build targets"
+        required: false
+        type: string
+        default: ''
 
 jobs:
   docker-build:
@@ -26,6 +41,7 @@ jobs:
 
       - name: Check for Go project
         id: check-go
+        working-directory: ${{ inputs.build_directory }}
         run: |
           if [ -f "go.mod" ]; then
             echo "go-project=true" >> $GITHUB_OUTPUT
@@ -39,9 +55,24 @@ jobs:
         if: steps.check-go.outputs.go-project == 'true'
         uses: actions/setup-go@v6
         with:
-          go-version-file: 'go.mod'
+          go-version-file: ${{ format('{0}/go.mod', inputs.build_directory) }}
           cache: true
 
+      - name: Run pre-build command
+        if: inputs.pre_build_command != ''
+        run: ${{ inputs.pre_build_command }}
+        working-directory: ${{ inputs.build_directory }}
+
       - name: Build Docker image
-        run: make docker-build
+        env:
+          BUILD_COMMAND: ${{ inputs.build_command }}
+          DOCKER_TARGETS: ${{ inputs.docker_targets }}
+        run: |
+          if [ -n "${DOCKER_TARGETS}" ]; then
+            for target in ${DOCKER_TARGETS}; do
+              DOCKER_TARGETS="${target}" ${BUILD_COMMAND}
+            done
+          else
+            ${BUILD_COMMAND}
+          fi
         working-directory: ${{ inputs.build_directory }}
