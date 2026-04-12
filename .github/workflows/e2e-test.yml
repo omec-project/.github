@@ -76,7 +76,7 @@ jobs:
         run: |
           set -e
           REPO_URL="https://github.com/opennetworkinglab/aether-onramp.git"
-          # Pin to a specific commit/tag for reproducible CI runs
+          # Track the latest aether-onramp main branch for integration testing
           AETHER_ONRAMP_REF="main"
           # Clone onramp repository to parent directory to avoid polluting current workspace
           AETHER_ONRAMP_DIR="${GITHUB_WORKSPACE}/../aether-onramp"
