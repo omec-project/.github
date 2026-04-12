@@ -78,9 +78,9 @@ jobs:
           REPO_URL="https://github.com/opennetworkinglab/aether-onramp.git"
           # Pin to a specific commit/tag for reproducible CI runs
           AETHER_ONRAMP_REF="main"
-          # Clone to parent directory to avoid polluting current workspace
+          # Clone onramp repository to parent directory to avoid polluting current workspace
           AETHER_ONRAMP_DIR="${GITHUB_WORKSPACE}/../aether-onramp"
-          if ! git clone --recursive --branch "${AETHER_ONRAMP_REF}" --depth 1 ${REPO_URL} "${AETHER_ONRAMP_DIR}"; then
+          if ! git clone --branch "${AETHER_ONRAMP_REF}" --depth 1 "${REPO_URL}" "${AETHER_ONRAMP_DIR}"; then
             echo "ERROR: Failed to clone aether-onramp repository from ${REPO_URL}" >&2
             exit 1
           fi
