@@ -57,140 +57,130 @@ def get_network_info() -> Tuple[str, str]:
         sys.exit(1)
 
 
-def update_hosts_ini(aether_dir: Path, ip_addr: str) -> None:
-    """Update the hosts.ini file with the detected IP address and CI user settings."""
+def update_hosts_ini(aether_dir: Path) -> None:
+    """Generate a localhost-only hosts.ini for CI, avoiding SSH transport."""
     hosts_file = aether_dir / 'hosts.ini'
 
-    # Detect current user and SSH key location
     import os
     ansible_user = os.environ.get('USER', 'runner')
 
-    # Check common SSH key locations
-    ssh_key_locations = [
-        '~/.ssh/id_rsa',
-        '~/.ssh/id_ed25519',
-        '~/.ssh/id_ecdsa',
-    ]
-    ssh_key_file = '~/.ssh/id_rsa'  # default
-    for key_path in ssh_key_locations:
-        expanded = Path(key_path).expanduser()
-        if expanded.exists():
-            ssh_key_file = key_path
-            break
-
-    if hosts_file.exists():
-        # Update existing file
-        content = hosts_file.read_text()
-        lines = content.splitlines()
-        updated_lines = []
-
-        for line in lines:
-            # Skip empty lines and comments
-            if not line.strip() or line.strip().startswith('#'):
-                updated_lines.append(line)
-                continue
-
-            # Update ansible parameters only in active lines
-            line = re.sub(r'ansible_host=\S+', f'ansible_host={ip_addr}', line)
-            line = re.sub(r'ansible_user=\S+', f'ansible_user={ansible_user}', line)
-            line = re.sub(r'ansible_ssh_private_key_file=\S+', f'ansible_ssh_private_key_file={ssh_key_file}', line)
-            updated_lines.append(line)
-
-        content = '\n'.join(updated_lines)
-        print(f"Updated existing {hosts_file} with IP: {ip_addr}, user: {ansible_user}")
-    else:
-        # Create new file if it doesn't exist
-        print(f"Creating new {hosts_file}")
-        content = (
-            "[all]\n"
-            f"node1 ansible_host={ip_addr} ansible_user={ansible_user} "
-            f"ansible_ssh_private_key_file={ssh_key_file}\n"
-            "\n"
-            "[master_nodes]\n"
-            "node1\n"
-            "\n"
-            "[worker_nodes]\n"
-            "\n"
-            "[gnbsim_nodes]\n"
-            "node1\n"
-        )
+    content = (
+        "[all]\n"
+        f"localhost ansible_connection=local ansible_user={ansible_user} "
+        "ansible_python_interpreter=/usr/bin/python3\n"
+        "\n"
+        "[master_nodes]\n"
+        "localhost\n"
+        "\n"
+        "[worker_nodes]\n"
+        "#node2\n"
+        "\n"
+        "[gnbsim_nodes]\n"
+        "localhost\n"
+    )
 
     hosts_file.write_text(content)
+    print(f"Generated local-only {hosts_file} for user: {ansible_user}")
+
+
+def update_nested_keys(data: object, key_name: str, value: str) -> int:
+    """Recursively update all matching keys in a nested YAML structure."""
+    updates = 0
+
+    if isinstance(data, dict):
+        for key, nested_value in data.items():
+            if key == key_name:
+                data[key] = value
+                updates += 1
+            else:
+                updates += update_nested_keys(nested_value, key_name, value)
+    elif isinstance(data, list):
+        for item in data:
+            updates += update_nested_keys(item, key_name, value)
+
+    return updates
 
 
 def update_vars_main(aether_dir: Path, interface: str, ip_addr: str) -> None:
     """Update vars/main.yml with detected interface and IP."""
     vars_file = aether_dir / 'vars' / 'main.yml'
-    content = vars_file.read_text()
+    with open(vars_file, 'r') as f:
+        vars_data = yaml.safe_load(f) or {}
 
-    # Replace interface and IP, asserting that the expected placeholders exist
-    updated_content = content.replace('ens18', interface)
-    if updated_content == content:
+    interface_updates = update_nested_keys(vars_data, 'data_iface', interface)
+    if interface_updates == 0:
         raise RuntimeError(
-            f"Expected interface placeholder 'ens18' not found in {vars_file}"
+            f"Expected at least one 'data_iface' entry in {vars_file}"
         )
 
-    content = updated_content
-    updated_content = content.replace('10.76.28.113', ip_addr)
-    if updated_content == content:
-        raise RuntimeError(
-            f"Expected IP address placeholder '10.76.28.113' not found in {vars_file}"
-        )
+    core_config = vars_data.get('core')
+    if not isinstance(core_config, dict):
+        raise RuntimeError(f"Expected top-level 'core' mapping in {vars_file}")
 
-    vars_file.write_text(updated_content)
+    amf_config = core_config.get('amf')
+    if not isinstance(amf_config, dict) or 'ip' not in amf_config:
+        raise RuntimeError(f"Expected path 'core.amf.ip' in {vars_file}")
+
+    amf_config['ip'] = ip_addr
+
+    with open(vars_file, 'w') as f:
+        yaml.dump(vars_data, f, default_flow_style=False, sort_keys=False)
+
     print(f"Updated {vars_file}")
 
 
-def update_timeouts_and_fixes(aether_dir: Path) -> None:
-    """Update various timeout values and apply fixes for CI environment."""
-
-    # Update RKE2 install timeouts
-    rke2_install = aether_dir / 'deps' / 'k8s' / 'roles' / 'rke2' / 'tasks' / 'install.yml'
-    content = rke2_install.read_text()
-    # Only update explicit timeout fields from 300s to 600s
-    updated_content, timeout_replacements = re.subn(r'(\btimeout:\s*)300s\b', r'\1600s', content)
-    if timeout_replacements == 0:
-        print(f"WARNING: No RKE2 timeout value 'timeout: 300s' found in {rke2_install}", file=sys.stderr)
-    content = updated_content
-    # Remove the deployment wait line that fails in fresh cluster
-    content = '\n'.join(
-        line
-        for line in content.splitlines()
-        if not ('kubectl' in line and 'wait deployment' in line and 'kube-system' in line)
-    )
-    rke2_install.write_text(content)
-    print(f"Updated RKE2 timeouts in {rke2_install}")
-
-    # Update 5gc deployment timeouts
-    core_install = aether_dir / 'deps' / '5gc' / 'roles' / 'core' / 'tasks' / 'install.yml'
-    core_content = core_install.read_text()
-    # Only update the specific timeout flags/values we expect
-    core_content, timeout_flag_replacements = re.subn(r'--timeout\s+10m\b', '--timeout 25m', core_content)
-    core_content, duration_replacements = re.subn(r'\b2m30s\b', '10m', core_content)
-    if timeout_flag_replacements == 0:
-        print(f"WARNING: No 5gc '--timeout 10m' option found in {core_install}", file=sys.stderr)
-    if duration_replacements == 0:
-        print(f"WARNING: No 5gc '2m30s' duration found in {core_install}", file=sys.stderr)
-    core_install.write_text(core_content)
-    print(f"Updated 5gc timeouts in {core_install}")
-
-
 def replace_aether_templates_with_placeholders(content: str) -> Tuple[str, Dict[str, str]]:
-    """Replace Aether templates {{ ... }} with placeholders."""
-    template_pattern = re.compile(r'\{\{[^}]+\}\}')
+    """Replace Aether template expressions and control lines with YAML-safe placeholders."""
+    expression_pattern = re.compile(r'\{\{[^}]+\}\}')
     templates = {}
     placeholder_index = 0
 
-    def replace_template(match):
+    def line_indent(line: str) -> str:
+        return line[: len(line) - len(line.lstrip(' \t'))]
+
+    def replace_control(template_text: str, indent: str) -> str:
+        nonlocal placeholder_index
+        placeholder = f"AETHER_CONTROL_PLACEHOLDER_{placeholder_index}"
+        templates[placeholder] = f"{indent}{template_text}"
+        placeholder_index += 1
+        return f'{indent}{placeholder}: "{placeholder}"'
+
+    def replace_expression(match: re.Match[str]) -> str:
         nonlocal placeholder_index
         template_text = match.group(0)
-        placeholder = f"AETHER_PLACEHOLDER_{placeholder_index}"
+        placeholder = f"AETHER_EXPR_PLACEHOLDER_{placeholder_index}"
         templates[placeholder] = template_text
         placeholder_index += 1
-        # Quote the placeholder so YAML parsers treat it as a string
+        # Quote the placeholder so YAML parsers treat it as a string.
         return f'"{placeholder}"'
 
-    modified_content = template_pattern.sub(replace_template, content)
+    processed_lines = []
+    original_lines = content.splitlines()
+
+    for index, line in enumerate(original_lines):
+        stripped_line = line.strip()
+        if stripped_line.startswith('{%') and stripped_line.endswith('%}'):
+            indent = line_indent(line)
+
+            if not indent:
+                for next_line in original_lines[index + 1:]:
+                    if next_line.strip():
+                        indent = line_indent(next_line)
+                        if indent:
+                            break
+
+            if not indent and processed_lines:
+                previous_line = processed_lines[-1]
+                if previous_line.strip():
+                    indent = line_indent(previous_line)
+
+            processed_lines.append(replace_control(stripped_line, indent))
+            continue
+
+        processed_lines.append(line)
+
+    modified_content = '\n'.join(processed_lines)
+    modified_content = expression_pattern.sub(replace_expression, modified_content)
     return modified_content, templates
 
 
@@ -204,6 +194,17 @@ def restore_aether_templates(content: str, templates: Dict[str, str]) -> str:
 
     for placeholder in sorted_placeholders:
         template = templates[placeholder]
+        if placeholder.startswith('AETHER_CONTROL_PLACEHOLDER_'):
+            control_line_pattern = re.compile(
+                rf'^\s*["\']?{re.escape(placeholder)}["\']?:\s*["\']?{re.escape(placeholder)}["\']?\s*$',
+                re.MULTILINE,
+            )
+            content, replacements = control_line_pattern.subn(template, content)
+            replacements_made += replacements
+            if replacements == 0:
+                print(f"WARNING: Control placeholder not found: {placeholder}", file=sys.stderr)
+            continue
+
         quoted_placeholder = f'"{placeholder}"'
 
         # Try quoted version first (as inserted), then unquoted (after YAML processing)
@@ -483,10 +484,8 @@ def main():
     print(f"Interface: {interface}")
 
     # Update basic aether-onramp configuration
-    update_hosts_ini(args.aether_onramp_dir, ip_addr)
+    update_hosts_ini(args.aether_onramp_dir)
     update_vars_main(args.aether_onramp_dir, interface, ip_addr)
-    update_timeouts_and_fixes(args.aether_onramp_dir)
-
     print("\nUpdated aether-onramp configuration files")
 
     # Configure sd-core images if parameters provided

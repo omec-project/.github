@@ -60,18 +60,6 @@ jobs:
           # Print Ansible version for reproducibility tracking
           ansible --version
 
-      - name: Generate SSH Key
-        run: |
-          set -e
-          # NOTE: This job runs on a GitHub-hosted runner. The VM and its filesystem
-          # are ephemeral and destroyed after the job completes, so this SSH key does
-          # not persist beyond the lifetime of this workflow run.
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          ssh-keygen -t rsa -b 2048 -f ~/.ssh/id_rsa -N "" -q
-          cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
-          chmod 600 ~/.ssh/authorized_keys
-
       - name: Clone aether-onramp repository
         run: |
           set -e
@@ -95,7 +83,7 @@ jobs:
 
       - name: Update aether-onramp configuration files
         run: |
-          # Update all configuration: hosts.ini, timeouts, and sd-core values with local image
+          # Generate a local-only inventory and update onramp configuration for CI
           python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" "${IMAGE_NAME}" "${LOCAL_IMAGE_NAME}"
 
       - name: Check values file
