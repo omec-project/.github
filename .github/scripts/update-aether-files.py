@@ -199,7 +199,7 @@ def restore_aether_templates(content: str, templates: Dict[str, str]) -> str:
                 rf'^\s*["\']?{re.escape(placeholder)}["\']?:\s*["\']?{re.escape(placeholder)}["\']?\s*$',
                 re.MULTILINE,
             )
-            content, replacements = control_line_pattern.subn(template, content)
+            content, replacements = control_line_pattern.subn(lambda _match: template, content)
             replacements_made += replacements
             if replacements == 0:
                 print(f"WARNING: Control placeholder not found: {placeholder}", file=sys.stderr)
