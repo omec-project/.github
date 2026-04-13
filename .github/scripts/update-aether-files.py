@@ -12,7 +12,7 @@ import sys
 import tempfile
 import shutil
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Optional, Tuple
 
 try:
     import yaml
@@ -129,10 +129,9 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str) -> None:
     print(f"Updated {vars_file}")
 
 
-def replace_aether_templates_with_placeholders(content: str) -> Tuple[str, Dict[str, str]]:
+def replace_aether_templates_with_placeholders(content: str) -> str:
     """Replace Aether template expressions and control lines with YAML-safe placeholders."""
     expression_pattern = re.compile(r'\{\{[^}]+\}\}')
-    templates = {}
     placeholder_index = 0
 
     def line_indent(line: str) -> str:
@@ -141,15 +140,12 @@ def replace_aether_templates_with_placeholders(content: str) -> Tuple[str, Dict[
     def replace_control(template_text: str, indent: str) -> str:
         nonlocal placeholder_index
         placeholder = f"AETHER_CONTROL_PLACEHOLDER_{placeholder_index}"
-        templates[placeholder] = f"{indent}{template_text}"
         placeholder_index += 1
         return f'{indent}{placeholder}: "{placeholder}"'
 
     def replace_expression(match: re.Match[str]) -> str:
         nonlocal placeholder_index
-        template_text = match.group(0)
         placeholder = f"AETHER_EXPR_PLACEHOLDER_{placeholder_index}"
-        templates[placeholder] = template_text
         placeholder_index += 1
         # Quote the placeholder so YAML parsers treat it as a string.
         return f'"{placeholder}"'
@@ -181,73 +177,7 @@ def replace_aether_templates_with_placeholders(content: str) -> Tuple[str, Dict[
 
     modified_content = '\n'.join(processed_lines)
     modified_content = expression_pattern.sub(replace_expression, modified_content)
-    return modified_content, templates
-
-
-def restore_aether_templates(content: str, templates: Dict[str, str]) -> str:
-    """Restore Aether templates from placeholders."""
-    replacements_made = 0
-
-    # Sort placeholders by length (longest first) to avoid partial matches
-    # For example, AETHER_PLACEHOLDER_100 must be replaced before AETHER_PLACEHOLDER_10
-    sorted_placeholders = sorted(templates.keys(), key=len, reverse=True)
-
-    for placeholder in sorted_placeholders:
-        template = templates[placeholder]
-        if placeholder.startswith('AETHER_CONTROL_PLACEHOLDER_'):
-            control_line_pattern = re.compile(
-                rf'^\s*["\']?{re.escape(placeholder)}["\']?:\s*["\']?{re.escape(placeholder)}["\']?\s*$',
-                re.MULTILINE,
-            )
-            content, replacements = control_line_pattern.subn(lambda _match: template, content)
-            replacements_made += replacements
-            if replacements == 0:
-                print(f"WARNING: Control placeholder not found: {placeholder}", file=sys.stderr)
-            continue
-
-        quoted_placeholder = f'"{placeholder}"'
-
-        # Try quoted version first (as inserted), then unquoted (after YAML processing)
-        if quoted_placeholder in content:
-            content = content.replace(quoted_placeholder, template)
-            replacements_made += 1
-        elif placeholder in content:
-            content = content.replace(placeholder, template)
-            replacements_made += 1
-        else:
-            print(f"WARNING: Placeholder not found: {placeholder[:30]}...", file=sys.stderr)
-
-    # Report restoration results
-    expected_count = len(templates)
-    print(f"Restored {replacements_made}/{expected_count} Aether templates")
-
-    if replacements_made == 0 and expected_count > 0:
-        print("ERROR: No templates were restored, but templates were expected", file=sys.stderr)
-        sys.exit(1)
-
-    return content
-
-
-def deep_merge_dict(base: dict, override: dict) -> dict:
-    """Recursively merge override dict into base dict."""
-    result = base.copy()
-    for key, value in override.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = deep_merge_dict(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
-def merge_yaml_files(base_file: Path, override_file: Path) -> dict:
-    """Merge two YAML files, with override taking precedence."""
-    with open(base_file, 'r') as f:
-        base = yaml.safe_load(f) or {}
-
-    with open(override_file, 'r') as f:
-        override = yaml.safe_load(f) or {}
-
-    return deep_merge_dict(base, override)
+    return modified_content
 
 
 def get_chart_info(aether_dir: Path) -> Tuple[str, str]:
@@ -358,6 +288,81 @@ def build_image_overrides(
     return overrides
 
 
+def render_section_images_block(images_config: dict) -> list[str]:
+    """Render an images block with the indentation expected in sd-core values."""
+    rendered = yaml.dump(
+        {'images': images_config},
+        default_flow_style=False,
+        sort_keys=False,
+    ).splitlines()
+    return [f"  {line}\n" for line in rendered]
+
+
+def apply_image_overrides_to_content(content: str, overrides: dict) -> str:
+    """Apply image overrides by rewriting only the relevant section blocks."""
+    lines = content.splitlines(keepends=True)
+
+    for section_name, override_struct in overrides.items():
+        section_header = f"{section_name}:"
+        section_start = None
+
+        for index, line in enumerate(lines):
+            if line.rstrip('\n') == section_header:
+                section_start = index
+                break
+
+        if section_start is None:
+            print(f"WARNING: Section not found in values file: {section_name}", file=sys.stderr)
+            continue
+
+        section_end = len(lines)
+        for index in range(section_start + 1, len(lines)):
+            line = lines[index]
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if line.startswith(' ') or line.startswith('\t'):
+                continue
+            if stripped.startswith('#') or stripped in ('---', '...'):
+                continue
+            section_end = index
+            break
+
+        images_block = render_section_images_block(override_struct['images'])
+
+        existing_start = None
+        existing_end = None
+        insert_at = None
+
+        for index in range(section_start + 1, section_end):
+            line = lines[index]
+            stripped = line.strip()
+
+            if line.startswith('  images:'):
+                existing_start = index
+                existing_end = section_end
+                for sibling_index in range(index + 1, section_end):
+                    sibling_line = lines[sibling_index]
+                    if sibling_line.startswith('  ') and not sibling_line.startswith('    '):
+                        existing_end = sibling_index
+                        break
+                break
+
+            if insert_at is None and stripped == 'config:':
+                insert_at = index
+
+        if existing_start is not None and existing_end is not None:
+            lines[existing_start:existing_end] = images_block
+            delta = len(images_block) - (existing_end - existing_start)
+            section_end += delta
+        else:
+            if insert_at is None:
+                insert_at = section_end
+            lines[insert_at:insert_at] = images_block
+
+    return ''.join(lines)
+
+
 def configure_sdcore_images(
     aether_dir: Path,
     image_name: str,
@@ -376,9 +381,9 @@ def configure_sdcore_images(
     # Read original content
     original_content = base_values_file.read_text()
 
-    # Replace Aether templates with placeholders
+    # Replace Aether templates with placeholders so YAML parsing can inspect enabled sections.
     print("Replacing Aether templates with placeholders...")
-    modified_content, template_map = replace_aether_templates_with_placeholders(original_content)
+    modified_content = replace_aether_templates_with_placeholders(original_content)
 
     # Write modified content to temp file for YAML processing
     with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_base:
@@ -420,30 +425,15 @@ def configure_sdcore_images(
                 registry_prefix
             )
 
-            # Write overrides to temp file
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_override:
-                yaml.dump(overrides, temp_override, default_flow_style=False, sort_keys=False)
-                temp_override_path = Path(temp_override.name)
+            # Update only the images blocks so templated YAML structure is preserved.
+            final_content = apply_image_overrides_to_content(original_content, overrides)
 
-            try:
-                # Merge the YAML files
-                merged_data = merge_yaml_files(temp_base_path, temp_override_path)
+            # Write final content back to original file
+            base_values_file.write_text(final_content)
 
-                # Write merged data back to string
-                merged_yaml = yaml.dump(merged_data, default_flow_style=False, sort_keys=False)
-
-                # Restore Aether templates
-                final_content = restore_aether_templates(merged_yaml, template_map)
-
-                # Write final content back to original file
-                base_values_file.write_text(final_content)
-
-                print(f"\n=== Image overrides merged into: {base_values_file} ===")
-                print(f"Local image ({image_name}): {local_image_name}")
-                print(f"Other images: {registry_prefix}<image from chart>")
-
-            finally:
-                temp_override_path.unlink(missing_ok=True)
+            print(f"\n=== Image overrides merged into: {base_values_file} ===")
+            print(f"Local image ({image_name}): {local_image_name}")
+            print(f"Other images: {registry_prefix}<image from chart>")
 
             # Clean up pulled chart
             shutil.rmtree(pulled_chart_dir, ignore_errors=True)
