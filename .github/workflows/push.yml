@@ -19,11 +19,3 @@ jobs:
       changed: ${{ needs.tag-github.outputs.changed }}
       version: ${{ needs.tag-github.outputs.version }}
     secrets: inherit
-
-  branch-release:
-    needs: tag-github
-    uses: ./.github/workflows/branch-release.yml
-    with:
-      release_branch: ${{ needs.tag-github.outputs.release_branch }}
-      version_branch: ${{ needs.tag-github.outputs.version_branch }}
-    secrets: inherit
