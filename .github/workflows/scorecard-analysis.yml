@@ -33,18 +33,24 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository_owner == inputs.allowed_org
     permissions:
-      # Needed to upload the results to code-scanning dashboard.
-      security-events: write
-      # Needed to publish results and get a badge (see publish_results below).
-      id-token: write
-      contents: read
       actions: read
-      # To allow GraphQL ListCommits to work
-      issues: read
-      pull-requests: read
-      # To detect SAST tools
+      artifact-metadata: read
+      attestations: read
       checks: read
-
+      code-quality: read
+      contents: read
+      deployments: read
+      discussions: read
+      id-token: write
+      issues: read
+      models: read
+      packages: read
+      pages: read
+      pull-requests: read
+      repository-projects: read
+      security-events: write
+      statuses: read
+      vulnerability-alerts: read
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@v2.19.1
