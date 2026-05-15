@@ -15,6 +15,11 @@ on:
         required: false
         type: string
         default: '.'
+      golangci_lint_version:
+        description: "golangci-lint version to use"
+        required: false
+        type: string
+        default: 'v2.11.3'
 
 jobs:
   lint:
@@ -32,6 +37,6 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9.2.0
         with:
-          version: v2.10.1
+          version: ${{ inputs.golangci_lint_version }}
           args: -v --config ./.golangci.yml
           working-directory: ${{ inputs.build_directory }}
