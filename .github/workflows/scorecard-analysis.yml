@@ -53,7 +53,7 @@ jobs:
       vulnerability-alerts: read
     steps:
       - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@v2.19.1
+        uses: step-security/harden-runner@v2.19.3
         with:
           egress-policy: audit
 
