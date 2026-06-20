@@ -19,10 +19,10 @@ jobs:
       NAMESPACE: aether-5gc
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Checkout omec-project/.github repository for scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/.github
           path: .github-repo
