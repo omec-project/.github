@@ -48,7 +48,7 @@ jobs:
           # Kubernetes dependencies
           sudo apt-get install -y conntrack socat ipset ebtables
           # Build and automation tools
-          sudo apt install -y pipx make ansible python3-yaml
+          sudo apt install -y make ansible python3-yaml
           # Print Ansible version for reproducibility tracking
           ansible --version
 
