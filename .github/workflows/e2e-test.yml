@@ -1,5 +1,5 @@
 # Copyright 2025 Canonical Ltd.
-# SPDX-FileCopyrightText: 2025-Present Intel Corporation
+# Copyright (c) 2025-Present Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 name: E2E tests
 
@@ -48,15 +48,7 @@ jobs:
           # Kubernetes dependencies
           sudo apt-get install -y conntrack socat ipset ebtables
           # Build and automation tools
-          sudo apt install -y pipx make python3-yaml
-          # Remove any existing ansible-core to avoid conflicts
-          pipx uninstall ansible-core || true
-          # Install Ansible via pipx for aether-onramp
-          pipx install --include-deps ansible
-          pipx ensurepath
-          # Ensure all ansible commands are in PATH
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          sudo apt install -y pipx make ansible python3-yaml
           # Print Ansible version for reproducibility tracking
           ansible --version
 
@@ -81,7 +73,11 @@ jobs:
       - name: Update aether-onramp configuration files
         run: |
           # Generate a local-only inventory and update onramp configuration for CI
-          python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" "${IMAGE_NAME}" "${LOCAL_IMAGE_NAME}"
+          if [ "${REPO_NAME}" = "gnbsim" ]; then
+            python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" --gnbsim-image "${LOCAL_IMAGE_NAME}"
+          else
+            python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" "${IMAGE_NAME}" "${LOCAL_IMAGE_NAME}"
+          fi
 
       - name: Check values file
         run: |
@@ -110,8 +106,6 @@ jobs:
           echo "=== Starting local registry ==="
           docker run -d --network host --name registry registry:2
 
-          # Build and push to local registry
-          LOCAL_IMAGE_NAME="localhost:5000/${IMAGE_NAME}:testing"
           echo "=== Building Docker image ${LOCAL_IMAGE_NAME} ==="
           if ! docker build -t "${LOCAL_IMAGE_NAME}" .; then
             echo "Docker build failed, aborting."
