@@ -101,8 +101,8 @@ def update_nested_keys(data: object, key_name: str, value: str) -> int:
     return updates
 
 
-def update_vars_main(aether_dir: Path, interface: str, ip_addr: str) -> None:
-    """Update vars/main.yml with detected interface and IP."""
+def update_vars_main(aether_dir: Path, interface: str, ip_addr: str, gnbsim_image: Optional[str] = None) -> None:
+    """Update vars/main.yml with detected interface, IP, and optionally gnbsim image."""
     vars_file = aether_dir / 'vars' / 'main.yml'
     with open(vars_file, 'r') as f:
         vars_data = yaml.safe_load(f) or {}
@@ -122,6 +122,22 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str) -> None:
         raise RuntimeError(f"Expected path 'core.amf.ip' in {vars_file}")
 
     amf_config['ip'] = ip_addr
+
+    if gnbsim_image is not None:
+        gnbsim_config = vars_data.get('gnbsim')
+        if not isinstance(gnbsim_config, dict):
+            raise RuntimeError(f"Expected top-level 'gnbsim' mapping in {vars_file}")
+
+        docker_config = gnbsim_config.get('docker')
+        if not isinstance(docker_config, dict):
+            raise RuntimeError(f"Expected path 'gnbsim.docker' mapping in {vars_file}")
+
+        container_config = docker_config.get('container')
+        if not isinstance(container_config, dict) or 'image' not in container_config:
+            raise RuntimeError(f"Expected path 'gnbsim.docker.container.image' in {vars_file}")
+
+        container_config['image'] = gnbsim_image
+        print(f"Updated gnbsim image to {gnbsim_image}")
 
     with open(vars_file, 'w') as f:
         yaml.dump(vars_data, f, default_flow_style=False, sort_keys=False)
@@ -461,6 +477,11 @@ def main():
         nargs='?',
         help='(optional) Local image tag to use for testing'
     )
+    parser.add_argument(
+        '--gnbsim-image',
+        dest='gnbsim_image',
+        help='(optional) gnbsim container image to use (e.g. 5gc-gnbsim:rel-2.1.1)'
+    )
 
     args = parser.parse_args()
 
@@ -475,11 +496,13 @@ def main():
 
     # Update basic aether-onramp configuration
     update_hosts_ini(args.aether_onramp_dir)
-    update_vars_main(args.aether_onramp_dir, interface, ip_addr)
+    update_vars_main(args.aether_onramp_dir, interface, ip_addr, args.gnbsim_image)
     print("\nUpdated aether-onramp configuration files")
 
-    # Configure sd-core images if parameters provided
-    if args.image_name and args.local_image_name:
+    # When a gnbsim image override is provided, leave sd-core values untouched.
+    if args.gnbsim_image is not None:
+        print("\n=== Skipping sd-core values configuration (--gnbsim-image provided) ===")
+    elif args.image_name and args.local_image_name:
         configure_sdcore_images(
             args.aether_onramp_dir,
             args.image_name,
