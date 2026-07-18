@@ -52,7 +52,7 @@ jobs:
 
       - name: Setup Go
         if: steps.check-go.outputs.go-project == 'true'
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version-file: 'go.mod'
           cache: true
