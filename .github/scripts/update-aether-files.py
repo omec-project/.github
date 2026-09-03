@@ -123,6 +123,14 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str, gnbsim_imag
 
     amf_config['ip'] = ip_addr
 
+    # Add resource requests and limits for MongoDB to avoid issues with GitHub
+    # runners computing limits
+    mongodb_config = core_config.setdefault('mongodb', {})
+    mongodb_config['resources'] = {
+        'requests': {'cpu': '250m', 'memory': '256Mi'},
+        'limits': {'cpu': '500m', 'memory': '512Mi'},
+    }
+
     if gnbsim_image is not None:
         gnbsim_config = vars_data.get('gnbsim')
         if not isinstance(gnbsim_config, dict):
@@ -372,6 +380,11 @@ def apply_image_overrides_to_content(content: str, overrides: dict) -> str:
             if line.startswith(' ') or line.startswith('\t'):
                 continue
             if stripped.startswith('#') or stripped in ('---', '...'):
+                continue
+            # Aether templates write Jinja control tags (e.g. "{% if %}") flush
+            # left even while logically nested inside an indented section, so
+            # they must not be mistaken for the start of the next top-level key.
+            if stripped.startswith('{%') and stripped.endswith('%}'):
                 continue
             section_end = index
             break
