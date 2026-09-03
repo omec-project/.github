@@ -147,7 +147,11 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str, gnbsim_imag
 
 def replace_aether_templates_with_placeholders(content: str) -> str:
     """Replace Aether template expressions and control lines with YAML-safe placeholders."""
-    expression_pattern = re.compile(r'\{\{[^}]+\}\}')
+    # Non-greedy up to the first '}}' rather than '[^}]+', so an expression that
+    # itself contains braces -- core.get('mongodb', {}) and the like -- is still
+    # matched. '[^}]+' stops at the inner '}', leaving the template in place for
+    # yaml.safe_load to read as a nested flow mapping.
+    expression_pattern = re.compile(r'\{\{.*?\}\}', re.DOTALL)
     placeholder_index = 0
 
     def line_indent(line: str) -> str:
