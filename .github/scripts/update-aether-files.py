@@ -123,6 +123,23 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str, gnbsim_imag
 
     amf_config['ip'] = ip_addr
 
+    # Add resource requests and limits for MongoDB to avoid issues with GitHub-hosted
+    # runner resource limits. Intentionally overwrites any existing
+    # core.mongodb.resources.requests/limits, since CI needs a guaranteed small
+    # footprint regardless of what the upstream chart defaults to.
+    mongodb_config = core_config.get('mongodb', {})
+    if not isinstance(mongodb_config, dict):
+        raise RuntimeError(f"Expected 'core.mongodb' to be a mapping in {vars_file}")
+    core_config['mongodb'] = mongodb_config
+
+    resources_config = mongodb_config.get('resources', {})
+    if not isinstance(resources_config, dict):
+        raise RuntimeError(f"Expected 'core.mongodb.resources' to be a mapping in {vars_file}")
+
+    resources_config['requests'] = {'cpu': '250m', 'memory': '256Mi'}
+    resources_config['limits'] = {'cpu': '500m', 'memory': '512Mi'}
+    mongodb_config['resources'] = resources_config
+
     if gnbsim_image is not None:
         gnbsim_config = vars_data.get('gnbsim')
         if not isinstance(gnbsim_config, dict):
@@ -372,6 +389,11 @@ def apply_image_overrides_to_content(content: str, overrides: dict) -> str:
             if line.startswith(' ') or line.startswith('\t'):
                 continue
             if stripped.startswith('#') or stripped in ('---', '...'):
+                continue
+            # Aether templates write Jinja control tags (e.g. "{% if %}") flush
+            # left even while logically nested inside an indented section, so
+            # they must not be mistaken for the start of the next top-level key.
+            if stripped.startswith('{%') and stripped.endswith('%}'):
                 continue
             section_end = index
             break
