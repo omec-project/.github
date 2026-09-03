@@ -147,7 +147,6 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str, gnbsim_imag
 
 def replace_aether_templates_with_placeholders(content: str) -> str:
     """Replace Aether template expressions and control lines with YAML-safe placeholders."""
-    expression_pattern = re.compile(r'\{\{[^}]+\}\}')
     placeholder_index = 0
 
     def line_indent(line: str) -> str:
@@ -159,12 +158,45 @@ def replace_aether_templates_with_placeholders(content: str) -> str:
         placeholder_index += 1
         return f'{indent}{placeholder}: "{placeholder}"'
 
-    def replace_expression(match: re.Match[str]) -> str:
+    def replace_expressions(text: str) -> str:
+        # Manual scan (instead of a regex) so that expressions containing
+        # nested single-brace literals, e.g. "{{ core.get('mongodb', {}) }}",
+        # are matched up to their real closing '}}' rather than the first '}'.
         nonlocal placeholder_index
-        placeholder = f"AETHER_EXPR_PLACEHOLDER_{placeholder_index}"
-        placeholder_index += 1
-        # Quote the placeholder so YAML parsers treat it as a string.
-        return f'"{placeholder}"'
+        result = []
+        i = 0
+        length = len(text)
+        while i < length:
+            if text[i:i + 2] == '{{':
+                depth = 0
+                j = i + 2
+                end = -1
+                while j < length:
+                    if text[j:j + 2] == '}}' and depth == 0:
+                        end = j
+                        break
+                    if text[j] == '{':
+                        depth += 1
+                    elif text[j] == '}' and depth > 0:
+                        depth -= 1
+                    j += 1
+
+                if end == -1:
+                    result.append(text[i])
+                    i += 1
+                    continue
+
+                placeholder = f"AETHER_EXPR_PLACEHOLDER_{placeholder_index}"
+                placeholder_index += 1
+                # Quote the placeholder so YAML parsers treat it as a string.
+                result.append(f'"{placeholder}"')
+                i = end + 2
+                continue
+
+            result.append(text[i])
+            i += 1
+
+        return ''.join(result)
 
     processed_lines = []
     original_lines = content.splitlines()
@@ -192,7 +224,7 @@ def replace_aether_templates_with_placeholders(content: str) -> str:
         processed_lines.append(line)
 
     modified_content = '\n'.join(processed_lines)
-    modified_content = expression_pattern.sub(replace_expression, modified_content)
+    modified_content = replace_expressions(modified_content)
     return modified_content
 
 
