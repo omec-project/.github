@@ -177,7 +177,7 @@ def replace_aether_templates_with_placeholders(content: str) -> str:
                         break
                     if text[j] == '{':
                         depth += 1
-                    elif text[j] == '}':
+                    elif text[j] == '}' and depth > 0:
                         depth -= 1
                     j += 1
 
