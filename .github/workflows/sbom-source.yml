@@ -40,7 +40,7 @@ jobs:
           ref: ${{ inputs.branch_name }}
 
       - name: Generate SBOM (Syft)
-        uses: anchore/sbom-action@v0.24.0
+        uses: anchore/sbom-action@v0.24.2
         with:
           path: ${{ inputs.path }}
           format: ${{ inputs.sbom_format }}
