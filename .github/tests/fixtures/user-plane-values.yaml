@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+images:
+  tags:
+    bess: upf-bess:rel-2.6.2
+    pfcp: upf-pfcp:rel-2.6.2
+    sriov: aether-cni:rel-1.4.1

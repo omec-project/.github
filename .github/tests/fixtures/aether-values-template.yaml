@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+omec-user-plane:
+  enable: true
+  images:
+    repository: ghcr.io/omec-project/
+    tags:
+      bess: upf-bess:old
+      pfcp: upf-pfcp:old
+      sriov: aether-cni:old
+  config:
+    enabled: true

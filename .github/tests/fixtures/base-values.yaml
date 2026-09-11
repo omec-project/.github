@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+omec-user-plane:
+  enable: true
+  config:
+    enabled: true
+
+omec-control-plane:
+  enable: false
