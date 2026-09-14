@@ -5,9 +5,11 @@
 
 import importlib.util
 import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -101,3 +103,25 @@ class ImageListTests(unittest.TestCase):
     def test_rejects_empty_image_list(self):
         with self.assertRaisesRegex(ValueError, 'must not be empty'):
             update_aether_files.image_list_to_overrides([])
+
+    def test_rejects_image_names_with_whitespace(self):
+        with self.assertRaisesRegex(ValueError, 'must be non-empty strings'):
+            update_aether_files.image_list_to_overrides(['   '])
+        with self.assertRaisesRegex(ValueError, 'must not contain whitespace'):
+            update_aether_files.image_list_to_overrides(['bess pfcp'])
+
+    def test_rejects_gnbsim_image_with_image_list(self):
+        with patch.object(
+            sys,
+            'argv',
+            [
+                str(SCRIPT),
+                self.temp_dir.name,
+                '--gnbsim-image',
+                'localhost:5000/gnbsim:testing',
+                '--image-list',
+                'bess',
+            ],
+        ):
+            with self.assertRaisesRegex(SystemExit, '2'):
+                update_aether_files.main()

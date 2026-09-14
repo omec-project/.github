@@ -514,8 +514,10 @@ def image_list_to_overrides(image_names: List[str]) -> Dict[str, str]:
     """Return local-registry overrides for the workflow's logical image names."""
     if not image_names:
         raise ValueError("image list must not be empty")
-    if any(not isinstance(image_name, str) or not image_name for image_name in image_names):
+    if any(not isinstance(image_name, str) or not image_name.strip() for image_name in image_names):
         raise ValueError("image list entries must be non-empty strings")
+    if any(any(character.isspace() for character in image_name) for image_name in image_names):
+        raise ValueError("image list entries must not contain whitespace")
     if len(set(image_names)) != len(image_names):
         raise ValueError("image list must not contain duplicates")
 
@@ -561,6 +563,11 @@ def main():
         print(f"ERROR: Directory does not exist: {args.aether_onramp_dir}", file=sys.stderr)
         sys.exit(1)
 
+    if args.image_list and (args.image_name or args.local_image_name):
+        parser.error('--image-list cannot be combined with image_name or local_image_name')
+    if args.gnbsim_image is not None and args.image_list:
+        parser.error('--gnbsim-image cannot be combined with --image-list')
+
     # Detect network interface and IP
     interface, ip_addr = get_network_info()
     print(f"Extracted IP: {ip_addr}")
@@ -570,9 +577,6 @@ def main():
     update_hosts_ini(args.aether_onramp_dir)
     update_vars_main(args.aether_onramp_dir, interface, ip_addr, args.gnbsim_image)
     print("\nUpdated aether-onramp configuration files")
-
-    if args.image_list and (args.image_name or args.local_image_name):
-        parser.error('--image-list cannot be combined with image_name or local_image_name')
 
     # When a gnbsim image override is provided, leave sd-core values untouched.
     if args.gnbsim_image is not None:
