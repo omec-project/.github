@@ -9,6 +9,16 @@ on:
       - main
 
 jobs:
+  test-e2e-configuration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check pyyaml
+      - run: python -m unittest discover -s .github/tests -v
+
   license-check:
     uses: ./.github/workflows/license-check.yml
     with:

@@ -12,7 +12,7 @@ import sys
 import tempfile
 import shutil
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 try:
     import yaml
@@ -301,8 +301,7 @@ def get_enabled_sections(base_values_file: Path) -> list:
 def build_image_overrides(
     chart_dir: Path,
     base_values_file: Path,
-    image_name: str,
-    local_image_name: str,
+    image_overrides: Dict[str, str],
     registry_prefix: str
 ) -> dict:
     """Build the image override structure for sd-core values based on enabled sections."""
@@ -335,8 +334,8 @@ def build_image_overrides(
 
         tags = {}
         for tag_name, tag_value in chart_values.get('images', {}).get('tags', {}).items():
-            if tag_name == image_name:
-                tags[tag_name] = local_image_name
+            if tag_name in image_overrides:
+                tags[tag_name] = image_overrides[tag_name]
             else:
                 tags[tag_name] = f"{registry_prefix}{tag_value}"
 
@@ -435,11 +434,10 @@ def apply_image_overrides_to_content(content: str, overrides: dict) -> str:
 
 def configure_sdcore_images(
     aether_dir: Path,
-    image_name: str,
-    local_image_name: str
+    image_overrides: Dict[str, str]
 ) -> None:
     """Configure sd-core values to use local registry image for testing."""
-    print(f"\n=== Configuring {image_name} to use local image ===")
+    print("\n=== Configuring local images ===")
 
     base_values_file = aether_dir / 'deps' / '5gc' / 'roles' / 'core' / 'templates' / 'sdcore-5g-values.yaml'
     registry_prefix = 'ghcr.io/omec-project/'
@@ -490,8 +488,7 @@ def configure_sdcore_images(
             overrides = build_image_overrides(
                 pulled_chart_dir,
                 temp_base_path,
-                image_name,
-                local_image_name,
+                image_overrides,
                 registry_prefix
             )
 
@@ -502,7 +499,8 @@ def configure_sdcore_images(
             base_values_file.write_text(final_content)
 
             print(f"\n=== Image overrides merged into: {base_values_file} ===")
-            print(f"Local image ({image_name}): {local_image_name}")
+            for image_name, local_image_name in image_overrides.items():
+                print(f"Local image ({image_name}): {local_image_name}")
             print(f"Other images: {registry_prefix}<image from chart>")
 
             # Clean up pulled chart
@@ -510,6 +508,23 @@ def configure_sdcore_images(
 
     finally:
         temp_base_path.unlink(missing_ok=True)
+
+
+def image_list_to_overrides(image_names: List[str]) -> Dict[str, str]:
+    """Return local-registry overrides for the workflow's logical image names."""
+    if not image_names:
+        raise ValueError("image list must not be empty")
+    if any(not isinstance(image_name, str) or not image_name.strip() for image_name in image_names):
+        raise ValueError("image list entries must be non-empty strings")
+    if any(any(character.isspace() for character in image_name) for image_name in image_names):
+        raise ValueError("image list entries must not contain whitespace")
+    if len(set(image_names)) != len(image_names):
+        raise ValueError("image list must not contain duplicates")
+
+    return {
+        image_name: f"localhost:5000/{image_name}:testing"
+        for image_name in image_names
+    }
 
 
 def main():
@@ -536,12 +551,22 @@ def main():
         dest='gnbsim_image',
         help='(optional) gnbsim container image to use (e.g. 5gc-gnbsim:rel-2.1.1)'
     )
+    parser.add_argument(
+        '--image-list',
+        nargs='+',
+        help='(optional) image names to override with localhost:5000/<name>:testing'
+    )
 
     args = parser.parse_args()
 
     if not args.aether_onramp_dir.exists():
         print(f"ERROR: Directory does not exist: {args.aether_onramp_dir}", file=sys.stderr)
         sys.exit(1)
+
+    if args.image_list and (args.image_name or args.local_image_name):
+        parser.error('--image-list cannot be combined with image_name or local_image_name')
+    if args.gnbsim_image is not None and args.image_list:
+        parser.error('--gnbsim-image cannot be combined with --image-list')
 
     # Detect network interface and IP
     interface, ip_addr = get_network_info()
@@ -556,11 +581,16 @@ def main():
     # When a gnbsim image override is provided, leave sd-core values untouched.
     if args.gnbsim_image is not None:
         print("\n=== Skipping sd-core values configuration (--gnbsim-image provided) ===")
+    elif args.image_list:
+        try:
+            image_overrides = image_list_to_overrides(args.image_list)
+        except ValueError as error:
+            parser.error(str(error))
+        configure_sdcore_images(aether_dir=args.aether_onramp_dir, image_overrides=image_overrides)
     elif args.image_name and args.local_image_name:
         configure_sdcore_images(
-            args.aether_onramp_dir,
-            args.image_name,
-            args.local_image_name
+            aether_dir=args.aether_onramp_dir,
+            image_overrides={args.image_name: args.local_image_name}
         )
     else:
         print("\n=== Skipping sd-core values configuration (IMAGE_NAME and LOCAL_IMAGE_NAME not provided) ===")
