@@ -77,7 +77,7 @@ jobs:
       - name: Create release using REST API
         if: steps.version-change.outputs.changed == 'true'
         run: |
-          curl -L \
+          curl --fail-with-body --show-error -L \
             -X POST \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer ${{ secrets.GH_OMEC_PAT }}" \
