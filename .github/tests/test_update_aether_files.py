@@ -34,8 +34,8 @@ class ImageListTests(unittest.TestCase):
         values_dir = self.chart_dir / 'bess-upf'
         values_dir.mkdir(parents=True)
         shutil.copy(FIXTURES / 'user-plane-values.yaml', values_dir / 'values.yaml')
-        self.base_values = root / 'base-values.yaml'
-        shutil.copy(FIXTURES / 'base-values.yaml', self.base_values)
+        self.base_values = root / 'user-plane-base-values.yaml'
+        shutil.copy(FIXTURES / 'user-plane-base-values.yaml', self.base_values)
 
         control_plane_dir = self.chart_dir / 'omec-5g-core'
         control_plane_dir.mkdir()

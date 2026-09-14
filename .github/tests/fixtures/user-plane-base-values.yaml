@@ -3,8 +3,3 @@
 
 omec-user-plane:
   enable: true
-  config:
-    enabled: true
-
-omec-control-plane:
-  enable: false
