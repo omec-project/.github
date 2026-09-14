@@ -3,6 +3,5 @@
 
 images:
   tags:
-    bess: upf-bess:rel-generic
-    pfcp: upf-pfcp:rel-generic
-    sriov: aether-cni:rel-generic
+    amf: 5gc-amf:rel-generic
+    nrf: 5gc-nrf:rel-generic

@@ -9,6 +9,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / 'scripts' / 'update-aether-files.py'
@@ -33,20 +35,26 @@ class ImageListTests(unittest.TestCase):
         self.base_values = root / 'base-values.yaml'
         shutil.copy(FIXTURES / 'base-values.yaml', self.base_values)
 
+        control_plane_dir = self.chart_dir / 'omec-5g-core'
+        control_plane_dir.mkdir()
+        shutil.copy(FIXTURES / 'control-plane-values.yaml', control_plane_dir / 'values.yaml')
+        self.control_plane_base_values = root / 'control-plane-base-values.yaml'
+        shutil.copy(FIXTURES / 'control-plane-base-values.yaml', self.control_plane_base_values)
+
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def test_legacy_single_image_override_is_unchanged(self):
         overrides = update_aether_files.build_image_overrides(
             self.chart_dir,
-            self.base_values,
-            {'bess': 'localhost:5000/bess:testing'},
+            self.control_plane_base_values,
+            {'amf': 'localhost:5000/amf:testing'},
             self.registry_prefix,
         )
 
-        tags = overrides['omec-user-plane']['images']['tags']
-        self.assertEqual(tags['bess'], 'localhost:5000/bess:testing')
-        self.assertEqual(tags['pfcp'], 'ghcr.io/omec-project/upf-pfcp:rel-2.6.2')
+        tags = overrides['omec-5g-core']['images']['tags']
+        self.assertEqual(tags['amf'], 'localhost:5000/amf:testing')
+        self.assertEqual(tags['nrf'], 'ghcr.io/omec-project/5gc-nrf:rel-generic')
 
     def test_upf_image_list_overrides_both_images(self):
         image_overrides = update_aether_files.image_list_to_overrides(['bess', 'pfcp'])
@@ -62,7 +70,29 @@ class ImageListTests(unittest.TestCase):
 
         self.assertIn('bess: localhost:5000/bess:testing', rendered)
         self.assertIn('pfcp: localhost:5000/pfcp:testing', rendered)
-        self.assertIn('sriov: ghcr.io/omec-project/aether-cni:rel-1.4.1', rendered)
+        self.assertIn('sriov: ghcr.io/omec-project/aether-cni:rel-generic', rendered)
+
+    def test_gnbsim_image_override_is_unchanged(self):
+        aether_dir = self.temp_dir.name
+        vars_dir = Path(aether_dir) / 'vars'
+        vars_dir.mkdir()
+        vars_file = vars_dir / 'main.yml'
+        shutil.copy(FIXTURES / 'gnbsim-vars-main.yaml', vars_file)
+
+        update_aether_files.update_vars_main(
+            Path(aether_dir),
+            'eth0',
+            '10.0.0.2',
+            'localhost:5000/gnbsim:testing',
+        )
+
+        with open(vars_file) as f:
+            vars_data = yaml.safe_load(f)
+
+        self.assertEqual(
+            vars_data['gnbsim']['docker']['container']['image'],
+            'localhost:5000/gnbsim:testing',
+        )
 
     def test_rejects_duplicate_image_names(self):
         with self.assertRaisesRegex(ValueError, 'duplicates'):
