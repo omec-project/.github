@@ -74,6 +74,21 @@ class ImageListTests(unittest.TestCase):
         self.assertIn('pfcp: localhost:5000/pfcp:testing', rendered)
         self.assertIn('sriov: ghcr.io/omec-project/aether-cni:rel-generic', rendered)
 
+    def test_upf_image_list_overrides_only_pfcp(self):
+        image_overrides = update_aether_files.image_list_to_overrides(['pfcp'])
+        overrides = update_aether_files.build_image_overrides(
+            self.chart_dir,
+            self.base_values,
+            image_overrides,
+            self.registry_prefix,
+        )
+
+        content = (FIXTURES / 'aether-values-template.yaml').read_text()
+        rendered = update_aether_files.apply_image_overrides_to_content(content, overrides)
+
+        self.assertIn('bess: ghcr.io/omec-project/upf-bess:rel-generic', rendered)
+        self.assertIn('pfcp: localhost:5000/pfcp:testing', rendered)
+
     def test_gnbsim_image_override_is_unchanged(self):
         aether_dir = self.temp_dir.name
         vars_dir = Path(aether_dir) / 'vars'
