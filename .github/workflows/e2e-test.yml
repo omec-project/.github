@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NAMESPACE: aether-5gc
+      INPUT_IMAGE_LIST: ${{ inputs.image_list }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -39,7 +40,15 @@ jobs:
           REPO_NAME=$(echo "${GITHUB_REPOSITORY}" | cut -d'/' -f2)
           # webconsole uses 'webui' as the image name
           IMAGE_NAME="${REPO_NAME/webconsole/webui}"
-          IMAGE_LIST="${{ inputs.image_list }}"
+          IMAGE_LIST="${INPUT_IMAGE_LIST}"
+          if [[ "${IMAGE_LIST}" == *$'\n'* || "${IMAGE_LIST}" == *$'\r'* ]]; then
+            echo "ERROR: image_list must be a single line" >&2
+            exit 1
+          fi
+          if [ "${REPO_NAME}" = "gnbsim" ] && [ -n "${IMAGE_LIST}" ]; then
+            echo "ERROR: image_list is not supported for GNBSIM" >&2
+            exit 1
+          fi
           if [ -z "${IMAGE_LIST}" ]; then
             IMAGE_LIST="${IMAGE_NAME}"
             if [ "${REPO_NAME}" = "upf" ]; then
@@ -87,7 +96,8 @@ jobs:
           if [ "${REPO_NAME}" = "gnbsim" ]; then
             python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" --gnbsim-image "localhost:5000/${IMAGE_NAME}:testing"
           else
-            python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" --image-list ${IMAGE_LIST}
+            read -r -a image_names <<< "${IMAGE_LIST}"
+            python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" --image-list "${image_names[@]}"
           fi
 
       - name: Check values file
@@ -117,7 +127,8 @@ jobs:
           echo "=== Starting local registry ==="
           docker run -d --network host --name registry registry:2
 
-          for image_name in ${IMAGE_LIST}; do
+          read -r -a image_names <<< "${IMAGE_LIST}"
+          for image_name in "${image_names[@]}"; do
             local_image_name="localhost:5000/${image_name}:testing"
             if [ "${REPO_NAME}" = "upf" ]; then
               echo "=== Building Docker image ${local_image_name} (target: ${image_name}) ==="
@@ -165,7 +176,8 @@ jobs:
           echo "Deployed container images:"
           printf '%s\n' "$deployed_images"
 
-          for image_name in ${IMAGE_LIST}; do
+          read -r -a image_names <<< "${IMAGE_LIST}"
+          for image_name in "${image_names[@]}"; do
             expected="localhost:5000/${image_name}:testing"
             if ! printf '%s\n' "$deployed_images" | grep -Fqx -- "$expected"; then
               echo "Expected deployed testing image was not found: $expected" >&2
