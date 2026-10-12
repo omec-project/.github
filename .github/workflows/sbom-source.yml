@@ -10,7 +10,7 @@ on:
         description: "Name of the branch to checkout"
         required: false
         type: string
-        default: ${{ github.ref }}
+        default: ${{ github.sha }}
       changed:
         required: true
         type: string
