@@ -125,8 +125,10 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str, gnbsim_imag
 
     # Add resource requests and limits for MongoDB to avoid issues with GitHub-hosted
     # runner resource limits. Intentionally overwrites any existing
-    # core.mongodb.resources.requests/limits, since CI needs a guaranteed small
-    # footprint regardless of what the upstream chart defaults to.
+    # core.mongodb.resources.mongod/agent, since CI needs a guaranteed small
+    # footprint regardless of what the upstream chart defaults to. The sd-core 6.0.0
+    # chart only reads resources.mongod and resources.agent; flat requests/limits
+    # are ignored and leave the 2-CPU-per-member defaults, which cannot be scheduled.
     mongodb_config = core_config.get('mongodb', {})
     if not isinstance(mongodb_config, dict):
         raise RuntimeError(f"Expected 'core.mongodb' to be a mapping in {vars_file}")
@@ -136,8 +138,14 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str, gnbsim_imag
     if not isinstance(resources_config, dict):
         raise RuntimeError(f"Expected 'core.mongodb.resources' to be a mapping in {vars_file}")
 
-    resources_config['requests'] = {'cpu': '250m', 'memory': '256Mi'}
-    resources_config['limits'] = {'cpu': '500m', 'memory': '512Mi'}
+    resources_config['mongod'] = {
+        'requests': {'cpu': '250m', 'memory': '256Mi'},
+        'limits': {'cpu': '500m', 'memory': '512Mi'},
+    }
+    resources_config['agent'] = {
+        'requests': {'cpu': '50m', 'memory': '128Mi'},
+        'limits': {'cpu': '100m', 'memory': '256Mi'},
+    }
     mongodb_config['resources'] = resources_config
 
     if gnbsim_image is not None:
