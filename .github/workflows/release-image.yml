@@ -2,7 +2,6 @@
 # SPDX-FileCopyrightText: 2025-present Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 name: Release Image
-
 on:
   workflow_call:
     inputs:
@@ -29,7 +28,6 @@ on:
         required: false
         type: string
         default: "main"
-
 jobs:
   release-image:
     runs-on: ubuntu-latest
@@ -38,7 +36,6 @@ jobs:
       DOCKER_TAG: rel-${{ inputs.version }}
     steps:
       - uses: actions/checkout@v7
-
       - name: Check for Go project
         id: check-go
         run: |
@@ -49,28 +46,24 @@ jobs:
             echo "go-project=false" >> $GITHUB_OUTPUT
             echo "No Go project detected"
           fi
-
       - name: Setup Go
         if: steps.check-go.outputs.go-project == 'true'
         uses: actions/setup-go@v7
         with:
           go-version-file: 'go.mod'
           cache: true
-
       - name: Login to Docker Hub
         uses: docker/login-action@v4
         with:
           registry: ${{ inputs.docker_registry }}
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
         with:
           registry: ${{ inputs.github_registry }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and Push to Docker Hub
         env:
           DOCKER_REGISTRY: ${{ inputs.docker_registry }}/
@@ -78,7 +71,6 @@ jobs:
         run: |
           make docker-build
           make docker-push
-
       - name: Build and Push to GitHub Container Registry
         env:
           DOCKER_REGISTRY: ${{ inputs.github_registry }}/

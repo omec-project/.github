@@ -6,12 +6,10 @@ on:
       - main
     paths:
       - "VERSION"
-
 jobs:
   tag-github:
     uses: ./.github/workflows/tag-github.yml
     secrets: inherit
-
   update-version:
     needs: tag-github
     uses: ./.github/workflows/update-version.yml

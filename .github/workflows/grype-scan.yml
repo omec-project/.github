@@ -50,7 +50,6 @@ jobs:
         with:
           name: ${{ inputs.artifact_name }}
           path: ${{ runner.temp }}/sbom
-
       - name: Locate SBOM file
         id: sbom-file
         run: |
@@ -61,7 +60,6 @@ jobs:
           fi
           echo "path=${SBOM_FILE}" >> "$GITHUB_OUTPUT"
           echo "Found SBOM: ${SBOM_FILE}"
-
       - name: Scan SBOM with Grype
         id: grype-scan
         uses: anchore/scan-action@v7
@@ -71,11 +69,9 @@ jobs:
           fail-build: ${{ inputs.fail_build }}
           only-fixed: ${{ inputs.only_fixed }}
           output-format: ${{ inputs.output_format }}
-
       - name: Checkout repository for SARIF scan
         if: ${{ inputs.upload_sarif && inputs.output_format == 'sarif' && always() }}
         uses: actions/checkout@v7
-
       - name: Scan source for GitHub Code Scanning SARIF
         if: ${{ inputs.upload_sarif && inputs.output_format == 'sarif' && always() }}
         id: grype-scan-sarif
@@ -86,7 +82,6 @@ jobs:
           fail-build: false
           only-fixed: ${{ inputs.only_fixed }}
           output-format: sarif
-
       - name: Normalize SARIF for GitHub Code Scanning
         if: ${{ inputs.upload_sarif && inputs.output_format == 'sarif' && always() }}
         env:
@@ -148,7 +143,6 @@ jobs:
           ' "${SARIF_FILE}" > "${tmp_file}"
 
           mv "${tmp_file}" "${SARIF_FILE}"
-
       - name: Validate normalized SARIF result locations
         if: ${{ inputs.upload_sarif && inputs.output_format == 'sarif' && always() }}
         env:
@@ -174,13 +168,11 @@ jobs:
             echo "::error::Normalized SARIF still contains ${invalid_count} invalid result locations"
             exit 1
           fi
-
       - name: Upload Grype SARIF to GitHub Code Scanning
         if: ${{ inputs.upload_sarif && inputs.output_format == 'sarif' && always() }}
         uses: github/codeql-action/upload-sarif@v4.39.1
         with:
           sarif_file: ${{ steps.grype-scan-sarif.outputs.sarif }}
-
       - name: Upload Grype results as artifact
         if: always()
         uses: actions/upload-artifact@v7.0.2

@@ -2,7 +2,6 @@
 # SPDX-FileCopyrightText: 2025 Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 name: Update Version
-
 on:
   workflow_call:
     inputs:
@@ -12,14 +11,12 @@ on:
       changed:
         required: true
         type: string
-
 jobs:
   update-version:
     runs-on: ubuntu-latest
     if: ${{ inputs.changed == 'true' }}
     steps:
       - uses: actions/checkout@v7
-
       - name: Increment version
         run: |
           version=${{ inputs.version }}
@@ -27,7 +24,6 @@ jobs:
           patch_update=$((patch+1))
           NEW_VERSION="$major.$minor.$patch_update-dev"
           echo $NEW_VERSION > VERSION
-
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v8
         with:
