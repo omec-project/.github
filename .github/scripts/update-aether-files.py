@@ -134,6 +134,11 @@ def update_vars_main(aether_dir: Path, interface: str, ip_addr: str, gnbsim_imag
         raise RuntimeError(f"Expected 'core.mongodb' to be a mapping in {vars_file}")
     core_config['mongodb'] = mongodb_config
 
+    # Single member, no arbiter, so the control plane fits a small runner.
+    # setdefault keeps any value already set in the vars template.
+    mongodb_config.setdefault('members', 1)
+    mongodb_config.setdefault('arbiters', 0)
+
     resources_config = mongodb_config.get('resources', {})
     if not isinstance(resources_config, dict):
         raise RuntimeError(f"Expected 'core.mongodb.resources' to be a mapping in {vars_file}")
