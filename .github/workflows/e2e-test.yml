@@ -2,7 +2,6 @@
 # Copyright (c) 2025-Present Intel Corporation
 # SPDX-License-Identifier: Apache-2.0
 name: E2E tests
-
 on:
   workflow_call:
     inputs:
@@ -16,7 +15,6 @@ on:
         required: false
         type: string
         default: ""
-
 jobs:
   e2e-tests:
     runs-on: ubuntu-latest
@@ -26,14 +24,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-
       - name: Checkout omec-project/.github repository for scripts
         uses: actions/checkout@v7
         with:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           path: .github-repo
-
       - name: Set image list
         run: |
           set -euo pipefail
@@ -60,7 +56,6 @@ jobs:
           echo "IMAGE_LIST=${IMAGE_LIST}" >> "$GITHUB_ENV"
           echo "Repository: ${REPO_NAME}"
           echo "Image list: ${IMAGE_LIST}"
-
       - name: Update and install dependencies
         run: |
           set -e
@@ -71,7 +66,6 @@ jobs:
           sudo apt install -y make ansible python3-yaml
           # Print Ansible version for reproducibility tracking
           ansible --version
-
       - name: Clone aether-onramp repository
         run: |
           set -e
@@ -89,7 +83,6 @@ jobs:
           git log -1 --format="Commit: %H%nAuthor: %an%nDate: %ad%nMessage: %s"
           # Export for use in subsequent steps
           echo "AETHER_ONRAMP_DIR=${AETHER_ONRAMP_DIR}" >> "$GITHUB_ENV"
-
       - name: Update aether-onramp configuration files
         run: |
           # Generate a local-only inventory and update onramp configuration for CI
@@ -99,23 +92,19 @@ jobs:
             read -r -a image_names <<< "${IMAGE_LIST}"
             python3 .github-repo/.github/scripts/update-aether-files.py "${AETHER_ONRAMP_DIR}" --image-list "${image_names[@]}"
           fi
-
       - name: Check values file
         run: |
           cat "${AETHER_ONRAMP_DIR}/deps/5gc/roles/core/templates/sdcore-5g-values.yaml"
-
       - name: Test aether-pingall
         run: |
           set -e
           cd "${AETHER_ONRAMP_DIR}"
           make aether-pingall
-
       - name: Install aether-k8s
         run: |
           set -e
           cd "${AETHER_ONRAMP_DIR}"
           make aether-k8s-install
-
       - name: Build and push local image to registry
         run: |
           set -ex
@@ -144,20 +133,17 @@ jobs:
             echo "=== Verifying ${image_name} in local registry ==="
             curl -f -X GET "http://localhost:5000/v2/${image_name}/tags/list"
           done
-
       - name: Install 5G Core
         id: install-5gc
         run: |
           set -e
           cd "${AETHER_ONRAMP_DIR}"
           make aether-5gc-install
-
       - name: Pods status
         run: |
           set -e
           echo "Pods status"
           kubectl get pods -n "$NAMESPACE"
-
       - name: Verify deployed test images
         run: |
           set -euo pipefail
@@ -185,19 +171,16 @@ jobs:
             fi
             echo "Verified deployed testing image: $expected"
           done
-
       - name: Install GNBSIM
         run: |
           set -e
           cd "${AETHER_ONRAMP_DIR}"
           make aether-gnbsim-install
-
       - name: Perform tests
         run: |
           set -e
           cd "${AETHER_ONRAMP_DIR}"
           make aether-gnbsim-run
-
       - name: Validate results
         run: |
           set -e
@@ -222,7 +205,6 @@ jobs:
             echo "$status"
             exit 1
           fi
-
       - name: Cleanup local registry
         if: always()
         run: |
@@ -231,7 +213,6 @@ jobs:
             docker stop registry || true
             docker rm registry || true
           fi
-
       - name: Dump all pod logs in aether-5gc namespace
         if: always() && (steps.install-5gc.outcome == 'success' || steps.install-5gc.outcome == 'failure')
         run: |
@@ -254,7 +235,6 @@ jobs:
             done
           done
           docker exec gnbsim-1 cat gnbsim.log > logs/gnbsim.log 2>&1 || true
-
       - name: Upload pod logs
         if: always() && (steps.install-5gc.outcome == 'success' || steps.install-5gc.outcome == 'failure')
         uses: actions/upload-artifact@v7.0.2

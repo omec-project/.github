@@ -1,6 +1,5 @@
 # SPDX-FileCopyrightText: 2026 The Linux Foundation
 # SPDX-License-Identifier: Apache-2.0
-
 core:
   amf:
     ip: 10.0.0.1
